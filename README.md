@@ -7,8 +7,8 @@ Main programs:<br/>
 This is for compiling a triton ir file to a cubin file.<br/>
 Pipeline: triton ir -> triton gpu ir -> llvm dialect -> llvm ir -> ptx -> cubin<br/>
 
-**2. runner**: [bin/runner.cpp](bin/runner.cpp)<br/>
-This is for running a generated cubin file.
+**2. runner**: [bin/run_add_kernel.cpp](bin/run_add_kernel.cpp)<br/>
+This is for running the cubin file generated from the triton ir file [add_kernel.ttir](./add_kernel.ttir).
 
 ## Build
 ```Bash

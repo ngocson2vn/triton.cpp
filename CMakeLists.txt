@@ -99,4 +99,8 @@ endif()
 find_package(Threads REQUIRED)
 
 add_subdirectory(third_party/f2reduce)
+
+set(CUDA_HOME "/usr/local/cuda-12.4")
+include_directories(${CUDA_HOME}/include)
+add_subdirectory(runtime)
 add_subdirectory(bin)

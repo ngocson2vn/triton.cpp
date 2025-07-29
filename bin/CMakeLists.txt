@@ -30,9 +30,6 @@ target_link_libraries(triton_compiler PRIVATE
 
 mlir_check_all_link_libraries(triton_compiler)
 
-set(CUDA_HOME "/usr/local/cuda-12.4")
-include_directories(${CUDA_HOME}/include)
-
 # Find the CUDA library
 find_library(CUDA_LIBRARY
   NAMES cuda
@@ -40,12 +37,11 @@ find_library(CUDA_LIBRARY
   PATH_SUFFIXES lib
   NO_DEFAULT_PATH
 )
-
 message(STATUS "CUDA_LIBRARY: ${CUDA_LIBRARY}")
 
-add_executable(runner runner.cpp)
-target_compile_options(runner PRIVATE -fno-rtti -g -O0)
-
-target_link_libraries(runner PRIVATE
+add_executable(run_add_kernel run_add_kernel.cpp)
+target_compile_options(run_add_kernel PRIVATE -fno-rtti -g -O0)
+target_link_libraries(run_add_kernel PRIVATE
+  runtime
   ${CUDA_LIBRARY}
 )
