@@ -2,3 +2,4 @@ build/
 llvm-project/
 .cmake.sha256
 output.*
+.vscode/vc.*
