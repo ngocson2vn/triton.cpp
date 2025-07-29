@@ -4,18 +4,32 @@
 #include "runtime/cubin_launcher.h"
 
 int main(int argc, char** argv) {
-  if (argc < 4) {
-    printf("Usage: %s /path/to/file.cubin KERNEL_NAME BLOCK_SIZE\n", argv[0]);
+  if (argc < 5) {
+    printf("Usage: %s /path/to/file.cubin kernelName numElements blockSize\n", argv[0]);
     return EXIT_FAILURE;
   }
 
   // Parse arguments
   std::string cubinFile = argv[1];
   std::string kernelName = argv[2];
+  
+  int numElements = -1;
+  try {
+    numElements = std::stoi(argv[3]);
+    if (numElements < 1) {
+      fprintf(stderr, "numElements should be a positive integer number.");
+    }
+  } catch (std::exception& ex) {
+    fprintf(stderr, "Failed to parse BLOCK_SIZE, error: %s\n", ex.what());
+    return EXIT_FAILURE;
+  }
 
   int blockSize = -1;
   try {
-    blockSize = std::stoi(argv[3]);
+    blockSize = std::stoi(argv[4]);
+    if (blockSize < 1) {
+      fprintf(stderr, "blockSize should be a positive integer number.");
+    }
   } catch (std::exception& ex) {
     fprintf(stderr, "Failed to parse BLOCK_SIZE, error: %s\n", ex.what());
     return EXIT_FAILURE;
@@ -26,7 +40,6 @@ int main(int argc, char** argv) {
   //
 
   // Allocate host input
-  int numElements = 1024;
 
   std::unique_ptr<float> h_input1_ptr(new float[numElements]);
   float* h_input1 = h_input1_ptr.get();
