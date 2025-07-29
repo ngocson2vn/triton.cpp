@@ -1,0 +1,34 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+        "name": "triton_compiler",
+        "type": "lldb-dap",
+        "request": "launch",
+        "program": "${workspaceFolder}/build/bin/triton_compiler",
+        "cwd": "${workspaceFolder}/",
+        "args": [
+            "./add_kernel.ttir"
+        ],
+        "env": {
+            "CUDA_VISIBLE_DEVICES": "0"
+        }
+    },
+    {
+        "name": "runner",
+        "type": "lldb-dap",
+        "request": "launch",
+        "program": "${workspaceFolder}/build/bin/runner",
+        "cwd": "${workspaceFolder}/",
+        "args": [
+            "${workspaceFolder}/output.cubin",
+            "add_kernel",
+            "64"
+        ],
+        "env": {}
+    }
+  ]
+}
