@@ -11,29 +11,28 @@ Pipeline: triton ir -> triton gpu ir -> llvm dialect -> llvm ir -> ptx -> cubin<
 This is for running the cubin file generated from the triton ir file [add_kernel.ttir](./add_kernel.ttir).
 
 ## Build
+### Prerequisites
 ```Bash
-#=========================
-# Prerequisites
-#=========================
 # clang 17
 wget https://apt.llvm.org/llvm.sh
 chmod u+x llvm.sh
 sudo apt install -y lsb-release wget software-properties-common gnupg
 sudo ./llvm.sh 17
-
 cd /usr/bin/
 sudo ln -sf ../lib/llvm-17/bin/clang .
 sudo ln -sf ../lib/llvm-17/bin/clang++ .
 sudo ln -sf ../lib/llvm-17/bin/ld.lld .
 sudo ln -sf ../lib/llvm-17/bin/llvm-dwarfdump .
-
-# lldb
 sudo ln -sf ../lib/llvm-17/bin/lldb .
 sudo ln -sf ../lib/llvm-17/bin/lldb-vscode ./lldb-dap
 
-#=========================
-# Run build script
-#=========================
+# CUDA
+/usr/local/cuda-12.4
+Minimum Driver Version: 535.183.06
+```
+
+### Run build script
+```
 ./build.sh
 ```
 
