@@ -35,6 +35,8 @@ if [ "${now_hash}" != "${pre_hash}" ]; then
     -DCOMPILER_RT_BUILD_GWP_ASAN=OFF \
     -DLLVM_INCLUDE_TESTS=OFF \
     -DCOMPILER_RT_BUILD_SANITIZERS=ON
+
+  yes | echo ${now_hash} > ${ROOT_DIR}/.cmake.sha256
 fi
 
 echo
@@ -44,5 +46,4 @@ echo "==================================================="
 cd ${ROOT_DIR}/build
 cmake --build .
 
-yes | echo ${now_hash} > ${ROOT_DIR}/.cmake.sha256
 echo "DONE"

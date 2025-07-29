@@ -2,4 +2,4 @@
 
 set -e
 
-./triton_compiler ./add_kernel.ttir
+./build/bin/triton_compiler ./add_kernel.ttir
