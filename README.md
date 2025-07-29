@@ -1,17 +1,18 @@
 # Prerequisites
 ```Bash
-# gcc
-gcc --version
-gcc (GCC) 12.5.0
+# clang 17
+wget https://apt.llvm.org/llvm.sh
+chmod u+x llvm.sh
+sudo apt install -y lsb-release wget software-properties-common gnupg
+sudo ./llvm.sh 17
 
-# sync triton code
-./scripts/sync.sh
-
-# llvm-project
-./scripts/llvm.sh
+cd /usr/bin/
+sudo ln -sf ../lib/llvm-17/bin/clang .
+sudo ln -sf ../lib/llvm-17/bin/clang++ .
+sudo ln -sf ../lib/llvm-17/bin/ld.lld .
+sudo ln -sf ../lib/llvm-17/bin/llvm-dwarfdump .
 
 # lldb-dap
-cd /usr/bin/
 sudo ln -sf ../lib/llvm-17/bin/lldb-vscode ./lldb-dap
 ```
 

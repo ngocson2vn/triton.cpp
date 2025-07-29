@@ -28,10 +28,8 @@ rsync -avRP ./third_party/nvidia          ${CURRENT_DIR}/
 rsync -avRP ./third_party/proton          ${CURRENT_DIR}/
 rsync -avRP ./third_party/f2reduce        ${CURRENT_DIR}/
 rsync -avRP ./cmake                       ${CURRENT_DIR}/
-
-rsync -avRP ./python                      ${CURRENT_DIR}/
-
-# rsync -avRP ./bin                         ${CURRENT_DIR}/
+rsync -avRP ./bin/*.h                     ${CURRENT_DIR}/
+rsync -avRP ./bin/*.txt                   ${CURRENT_DIR}/
 
 echo
 echo "DONE"
