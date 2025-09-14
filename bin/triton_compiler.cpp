@@ -37,6 +37,7 @@
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
 #include "llvm/Transforms/InstCombine/InstCombine.h"
@@ -461,8 +462,10 @@ int main(int argc, char **argv) {
 
   mlir::DialectRegistry registry;
   registerTritonDialects(registry);
-  mlir::registerNVVMDialectTranslation(registry);
+
+  // For translating MLIR module to LLVM IR
   mlir::registerBuiltinDialectTranslation(registry);
+  mlir::registerNVVMDialectTranslation(registry);
   mlir::registerLLVMDialectTranslation(registry);
 
   MLIRContext context(registry);
@@ -486,11 +489,41 @@ int main(int argc, char **argv) {
 
   // Set up the pass manager
   PassManager pm(&context);
+  std::string errorMessage;
+
+  // lowering
+  auto output = mlir::openOutputFile("lowering.mlir", &errorMessage);
+  if (!output) {
+    llvm::errs() << errorMessage << "\n";
+    std::terminate();
+  }
+
+  mlir::OpPrintingFlags printFlag{};
+  pm.enableIRPrinting(
+    /*shouldPrintBeforePass=*/[](mlir::Pass* p, mlir::Operation* op) {
+      return false;
+    },
+    /*shouldPrintAfterPass=*/[](mlir::Pass* p, mlir::Operation * op) {
+      return true;
+    },
+    /*printModuleScope=*/false, 
+    /*printAfterOnlyOnChange=*/true,
+    /*printAfterOnlyOnFailure=*/false, 
+    output->os(), printFlag
+  );
+  output->keep();
+
+  // Common variables
+  int capability = 86;
+  std::string arch = "sm_";
+  arch.append(std::to_string(capability));
+  std::string features = "+ptx";
+  features.append(std::to_string(capability));
+  std::string triple = "nvptx64-nvidia-cuda";
 
   //===========================================================================
   // make_ttgir
   //===========================================================================
-  int capability = 86;
   std::string targetStr = std::string("cuda:").append(std::to_string(capability));
   pm.addPass(mlir::triton::createConvertTritonToTritonGPU({targetStr, 4, 32, 1}));
   pm.addPass(mlir::triton::gpu::createTritonGPUCoalesce());
@@ -552,7 +585,6 @@ int main(int argc, char **argv) {
   pm.addPass(mlir::createSCCPPass());
   pm.addPass(mlir::createCanonicalizerPass());
   
-  
   //===========================================================================
   // make_llir
   //===========================================================================
@@ -603,19 +635,11 @@ int main(int argc, char **argv) {
   });
 
   llvm::LLVMContext llvmContext;
-  std::unique_ptr<llvm::Module> llvmMod = mlir::translateModuleToLLVMIR(module.get(), llvmContext);
+  auto llvmMod = mlir::translateModuleToLLVMIR(module.get(), llvmContext);
   if (!llvmMod) {
     llvm::errs() << "failed to translate module to LLVM IR\n";
     std::terminate();
   }
-
-  std::string arch = "sm_";
-  arch.append(std::to_string(capability));
-
-  std::string features = "+ptx";
-  features.append(std::to_string(capability));
-
-  std::string triple = "nvptx64-nvidia-cuda";
 
   auto options = llvm::cl::getRegisteredOptions();
   const char *flag = "nvptx-short-ptr";
@@ -660,16 +684,17 @@ int main(int argc, char **argv) {
   llvm::outs() << "=================================================\n";
   llvm::outs() << *llvmMod << "\n";
 
+
   //===========================================================================
   // make_ptx
   //===========================================================================
   std::string ptx = translateLLVMIRToASM(*llvmMod, triple, arch, features);
-
   llvm::outs() << "\n";
   llvm::outs() << "=================================================\n";
   llvm::outs() << "PTX\n";
   llvm::outs() << "=================================================\n";
   llvm::outs() << ptx << "\n";
+
 
   //===========================================================================
   // make_cubin

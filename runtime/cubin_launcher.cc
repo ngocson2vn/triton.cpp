@@ -103,26 +103,26 @@ static CudaInitializer _cudaInit;
 
 class DevicePtr {
  public:
-  // Forbid default constructor
-  DevicePtr() = delete;
-
   // Allow custom constructor
   DevicePtr(CUdeviceptr ptr) : ptr_(ptr) {
-    fprintf(stdout, "Allocated device ptr %llu\n", ptr_);
+    fprintf(stdout, "Allocated device ptr_ %llu\n", ptr_);
   }
+
+  // Allow move constructor
+  DevicePtr(DevicePtr&& rhs) noexcept {
+    // By default, ptr_ is initialized to 0
+    std::swap(ptr_, rhs.ptr_);
+    fprintf(stdout, "DevicePtr move ctor ptr_ %llu rhs.ptr_ %llu\n", ptr_, rhs.ptr_);
+  }
+
+  // Forbid default constructor
+  DevicePtr() = delete;
 
   // Forbid copy constructor
   DevicePtr(const DevicePtr& rhs) = delete;
 
   // Forbid copy assignment operator
   DevicePtr& operator=(const DevicePtr& rhs) = delete;
-
-  // Allow move constructor
-  DevicePtr(DevicePtr&& rhs) noexcept {
-    ptr_ = rhs.ptr_;
-    rhs.ptr_ = 0;
-    fprintf(stdout, "DevicePtr move ctor ptr %llu\n", ptr_);
-  }
 
   // Forbid move assignment operator
   DevicePtr& operator=(DevicePtr&& rhs) = delete;
@@ -145,7 +145,7 @@ class DevicePtr {
   }
 
  private:
-  CUdeviceptr ptr_;
+  CUdeviceptr ptr_ = 0;
 };
 
 
