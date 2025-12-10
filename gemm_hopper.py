@@ -5,6 +5,7 @@ import triton.profiler as proton
 from triton.tools.tensor_descriptor import TensorDescriptor
 from contextlib import contextmanager
 from typing import Optional
+from triton.runtime.cache import get_cache_manager
 
 if torch.cuda.is_available():
     from triton._C.libtriton import nvidia
@@ -14,12 +15,12 @@ else:
     cublas = None
 
 
-def is_cuda():
-    return triton.runtime.driver.active.get_current_target().backend == "cuda"
+# def is_cuda():
+#     return triton.runtime.driver.active.get_current_target().backend == "cuda"
 
 
-def supports_tma():
-    return is_cuda() and torch.cuda.get_device_capability()[0] >= 9
+# def supports_tma():
+#     return is_cuda() and torch.cuda.get_device_capability()[0] >= 9
 
 
 def is_hopper():
@@ -44,20 +45,21 @@ def _matmul_launch_metadata(grid, kernel, args):
     return ret
 
 
-HAS_TENSOR_DESC = supports_tma() and hasattr(tl, "make_tensor_descriptor")
-HAS_HOST_TENSOR_DESC = supports_tma() and hasattr(triton.tools.tensor_descriptor, "TensorDescriptor")
-HAS_WARP_SPECIALIZE = supports_ws() and HAS_TENSOR_DESC
+# HAS_TENSOR_DESC = supports_tma() and hasattr(tl, "make_tensor_descriptor")
+# HAS_HOST_TENSOR_DESC = supports_tma() and hasattr(triton.tools.tensor_descriptor, "TensorDescriptor")
+# HAS_WARP_SPECIALIZE = supports_ws() and HAS_TENSOR_DESC
 
 
 def matmul_get_configs(pre_hook=None):
     return [
-        triton.Config({'BLOCK_SIZE_M': BM, 'BLOCK_SIZE_N': BN, "BLOCK_SIZE_K": BK, "GROUP_SIZE_M": 8}, 
+        triton.Config({'BLOCK_SIZE_M': BM, 'BLOCK_SIZE_N': BN, "BLOCK_SIZE_K": BK, "GROUP_SIZE_M": GM}, 
                       num_stages=s,
                       num_warps=8,  # <--- FIXED: Force 8 warps for Warp Specialization
                       pre_hook=pre_hook)
-        for BM in [64, 128]
-        for BN in [64, 128, 256]
+        for BM in [64]
+        for BN in [64]
         for BK in [64]          # Recommend sticking to 64 for BK to save SRAM
+        for GM in [4, 8]
         for s in ([3, 4, 5])    # TMA benefits from more stages (3+)
     ]
 
@@ -77,16 +79,14 @@ def matmul_tma_set_block_size_hook(nargs):
     key=["M", "N", "K", "WARP_SPECIALIZE"],
 )
 @triton.jit(launch_metadata=_matmul_launch_metadata)
-def matmul_kernel_tma(a_desc, b_desc, c_desc,  #
-                      M, N, K,  #
-                      BLOCK_SIZE_M: tl.constexpr,  #
-                      BLOCK_SIZE_N: tl.constexpr,  #
-                      BLOCK_SIZE_K: tl.constexpr,  #
-                      GROUP_SIZE_M: tl.constexpr,  #
-                      WARP_SPECIALIZE: tl.constexpr,  #
+def matmul_kernel_tma(a_desc, b_desc, c_desc,
+                      M, N, K,
+                      BLOCK_SIZE_M: tl.constexpr,
+                      BLOCK_SIZE_N: tl.constexpr,
+                      BLOCK_SIZE_K: tl.constexpr,
+                      GROUP_SIZE_M: tl.constexpr,
+                      WARP_SPECIALIZE: tl.constexpr,
                       ):
-    OUTPUT_DTYPE = tl.float16
-
     pid = tl.program_id(axis=0)
     num_pid_m = tl.cdiv(M, BLOCK_SIZE_M)
     num_pid_n = tl.cdiv(N, BLOCK_SIZE_N)
@@ -135,11 +135,24 @@ def matmul_tma(a, b, warp_specialize: bool):
         BLOCK_N = META["BLOCK_SIZE_N"]
         return (triton.cdiv(M, BLOCK_M) * triton.cdiv(N, BLOCK_N), )
 
-    matmul_kernel_tma[grid](
+    kernel = matmul_kernel_tma[grid](
         a_desc, b_desc, c_desc,
         M, N, K,
         WARP_SPECIALIZE=warp_specialize
     )
+
+    # print(matmul_kernel_tma.cache)
+
+    # Inspect cache entries
+    # key = (M, N, K, warp_specialize)
+    # cm = get_cache_manager(str(key))
+    # print(cm.key)
+
+    # for k, entry in cm.cache.items():
+    #     print("Hash:", k)
+    #     print("Dir :", entry.path)
+    #     print()
+
     return c
 
 
