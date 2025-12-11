@@ -130,7 +130,9 @@
     "sim_unordered_set": "cpp",
     "sim_vector": "cpp",
     "*.mlir": "mlir",
-    "*.ttir": "mlir"
+    "*.ttir": "mlir",
+    "*.ttgir": "mlir",
+    "*.llir": "mlir"
   },
   "python.languageServer": "Pylance",
   "python.analysis.extraPaths": [

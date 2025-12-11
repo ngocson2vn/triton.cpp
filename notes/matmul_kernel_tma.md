@@ -339,6 +339,7 @@ $L__tmp5:
 // Similar predicates for B load.
 
 	add.s32 	%r77, %r73, 40960;
+// 40960 = 5 * (64*64*2), which is 5 64x64 A-tiles
 // %r77 = shared + 40960 (offset for B tile?).
 
 	// begin inline asm
@@ -550,41 +551,83 @@ $L__BB0_3:                              // =>This Inner Loop Header: Depth=1
 // %p48 = iter < %r6.
 
 	add.s32 	%r334, %r429, 1;
-// Iteration 0
+// Iteration 0:
 //   %r429 was initialized to -1
 //   %r334 = %r429 +1 = -1 + 1 = 0.
 // Iteration 1:
 //   %r334 = 0 + 1 = 1
 // Iteration 2:
 //   %r334 = 1 + 1 = 2
+// Iteration 3:
+//   %r334 = 2 + 1 = 3
+// Iteration 4:
+//   %r334 = 3 + 1 = 4
+// Iteration 5:
+//   %r334 = 4 + 1 = 5
 
 	setp.gt.s32 	%p49, %r334, 4;
-// %p49 = %r334 > 4 = false.
+// Iteration 0 ~ 4:
+//   %p49 = [0, 1, 2, 3, 4] > 4 = false.
+// Iteration 5:
+//   %p49 = 5 > 4 = true
 
 	selp.b32 	%r429, 0, %r334, %p49;
-// %r429 = %p49 ? 0 : %r334 = 0 (because %p49 == 0 and %r334 == 0).
+// Iteration 0:
+//   %r429 = %r334 = 0 (because %p49 = false and %r334 = 0).
 // Iteration 1:
-// %r429 = %r334 = 1
+//   %r429 = %r334 = 1 (because %p49 = false and %r334 = 1).
+// Iteration 2:
+//   %r429 = %r334 = 2 (because %p49 = false and %r334 = 2).
+// Iteration 3:
+//   %r429 = %r334 = 3 (because %p49 = false and %r334 = 3).
+// Iteration 4:
+//   %r429 = %r334 = 4 (because %p49 = false and %r334 = 4).
+// Iteration 5:
+//   %r429 = 0
 
 	selp.b32 	%r335, 1, 0, %p49;
-// %r335 = %p49 ? 1 : 0 = 0 (because %p49 == false).
+// Iteration 0 ~ 4:
+//   %r335 = %p49 ? 1 : 0 = 0 (because %p49 == false).
+// Iteration 5:
+//   %r335 = 1
 
 	xor.b32 	%r428, %r428, %r335;
 // Toggle %r428 (parity? For barrier phase).
-// %r428 was initialized to 0 before the main loop
-// %r428 = (0 xor 0) = 0
+// Iteration 0 ~ 4:
+//   %r428 was initialized to 0 before the main loop
+//   %r428 = (0 xor 0) = 0
+// Iteration 5:
+//   %r428 = (0 xor 1) = 1
 
 	shl.b32 	%r336, %r429, 3;
-// %r336 = %r429 * (2^3) = 0 (because %r429 = 0).
+// Here, 2^3 = 8 means the size of one mbarrier object are 8 bytes
+// Iteration 0:
+//   %r336 = 0 * 2^3 = 0 * 8 (because %r429 = 0).
 // Iteration 1:
-// %r336 = 1 * 2^3 = 8
-// Here, 8 means the size of one mbarrier object are 8 bytes
+//   %r336 = 1 * 2^3 = 1 * 8
+// Iteration 2:
+//   %r336 = 2 * 2^3 = 2 * 8
+// Iteration 3:
+//   %r336 = 3 * 2^3 = 3 * 8
+// Iteration 4:
+//   %r336 = 4 * 2^3 = 4 * 8
+// Iteration 5:
+//   %r336 = 0 * 2^3 = 0 * 8
 
 	add.s32 	%r151, %r67, %r336;
 // %r151 = barrier base + offset (selects which of the 5 barriers).
-// For the first iteration, %r336 = 0, then %r151 = %r67 which is the first mbarrier.
+// Iteration 0:
+//   %r151 = %r67 + 0 * 8 = %r67 which is the 1st mbarrier
 // Iteration 1:
-// %r151 = %r67 + 8 = %r68
+//   %r151 = %r67 + 1 * 8 = %r68 which is the 2nd mbarrier
+// Iteration 2:
+//   %r151 = %r67 + 2 * 8 = %r69 which is the 3rd mbarrier
+// Iteration 3:
+//   %r151 = %r67 + 3 * 8 = %r70 which is the 4th mbarrier
+// Iteration 4:
+//   %r151 = %r67 + 4 * 8 = %r71 which is the 5th mbarrier
+// Iteration 5:
+//   %r151 = %r67 + 0 * 8 = %r67 which is the 1st mbarrier
 
 	bar.sync 	0;
 
@@ -596,30 +639,48 @@ $L__BB0_3:                              // =>This Inner Loop Header: Depth=1
 	mbarrier.try_wait.parity.shared.b64 complete, [%r151], %r428;
 	@!complete bra.uni waitLoop;
 }
-// For each iteration, this code block checks completeness of only one mbarrier object
-// which means only 1 pair of A-tile and B-tile are loaded into shared memory after this point.
-
 	// end inline asm
 // Wait on the barrier [%r151] with parity %r428 until complete.
+// For each iteration, this code block checks completeness of only one mbarrier object
+// which means only 1 pair of A-tile and B-tile are loaded into shared memory after this point.
+// Iteration 0:
+//   Wait for the 1st slot because %r151 is the 1st mbarrier
+// Iteration 1:
+//   Wait for the 2nd slot because %r151 is the 2nd mbarrier
+// Iteration 2:
+//   Wait for the 3rd slot because %r151 is the 3rd mbarrier
+// Iteration 3:
+//   Wait for the 4th slot because %r151 is the 4th mbarrier
+// Iteration 4:
+//   Wait for the 5th slot because %r151 is the 5th mbarrier
 
 	.loc	1 106 24                        // gemm_hopper.py:106:24
 	shl.b32 	%r339, %r429, 13;
 // %r339 = %r429 * (2^13 = 8192).
 // Here, 2^13 = 64 * 64 * 2 = size of 1 A/B-tile
-// First iteration:
-// 	%r429 = 0 -> %r339 = 0
+// Iteration 0:
+//   %r339 = 0 * 2^13
 // Iteration 1:
-// 	%r429 = 1 -> %r339 = 1 * 2^13
+//   %r339 = 1 * 2^13
+// Iteration 2:
+//   %r339 = 2 * 2^13
+// Iteration 3:
+//   %r339 = 3 * 2^13
+// Iteration 4:
+//   %r339 = 4 * 2^13
 
 	add.s32 	%r300, %r77, %r339;
 // %r300 = B_shared_base + stage_offset.
 // This is stage B-tile 64x64 address
 // If the number of stages = 5, then B-tiles in shared memory look like:
+// iter0   iter1   iter2   iter3   iter4
 // 64*64*2|64*64*2|64*64*2|64*64*2|64*64*2 
 
 	.loc	1 105 24                        // gemm_hopper.py:105:24
 	add.s32 	%r297, %r73, %r339;
 // %r297 = A_shared_base + stage_offset.
+// iter0   iter1   iter2   iter3   iter4
+// 64*64*2|64*64*2|64*64*2|64*64*2|64*64*2 
 
 	.loc	1 107 37                        // gemm_hopper.py:107:37
 	shfl.sync.idx.b32 	%r341, %r448, 0, 31, -1;
@@ -689,6 +750,16 @@ $L__BB0_3:                              // =>This Inner Loop Header: Depth=1
 	// end inline asm
 // Perform async WGMMAs: 64x32x16 matrix multiply, accum in f32, inputs f16, using descriptors %rd15 (A), %rd16 (B), predicate %p39, other params for layout/transpose/scale.
 // The 1st A[64, 16] * B[32, 16] in warpgroup 0 and A[64, 16] * B[32, 16] in warpgroup 1
+// Iteration 0:
+//   Consume the 1st slot
+// Iteration 1:
+//   Consume the 2nd slot
+// Iteration 2:
+//   Consume the 3rd slot
+// Iteration 3:
+//   Consume the 4th slot
+// Iteration 4:
+//   Consume the 5th slot
 
 	add.s32 	%r347, %r297, 32;
 // Move to next 64x16 tile along K dimension
@@ -778,21 +849,40 @@ $L__BB0_3:                              // =>This Inner Loop Header: Depth=1
 	.loc	1 103 31                        // gemm_hopper.py:103:31
 	add.s32 	%r359, %r430, 1;
 // %r430 was initialized to 3 before the main loop, so
+// Iteration 0:
 // %r359 = 3 + 1 = 4
 // Iteration 1:
 //   %r359 = 4 + 1 = 5
+// Iteration 2:
+//   %r359 = 0 + 1 = 1
+// Iteration 3:
+//   %r359 = 1 + 1 = 2
+// Iteration 4:
+//   %r359 = 2 + 1 = 3
 
 	setp.gt.s32 	%p50, %r359, 4;
 // Since %r359 = 4 which is not greater than 4
 //   %p50 = false
 // Iteration 1:
 //   %p50 = true
+// Iteration 2:
+//   %p50 = false
+// Iteration 3:
+//   %p50 = false
+// Iteration 4:
+//   %p50 = false
 
 	selp.b32 	%r430, 0, %r359, %p50;
-// First iteration:
+// Iteration 0:
 //   %r430 = %r359 = 4
 // Iteration 1:
 //   %r430 = 0
+// Iteration 2:
+//   %r430 = 1
+// Iteration 3:
+//   %r430 = 2
+// Iteration 4:
+//   %r430 = 3
 
 	shl.b32 	%r360, %r430, 3;
 // %r360 = 4 * 2^3
@@ -801,12 +891,24 @@ $L__BB0_3:                              // =>This Inner Loop Header: Depth=1
 //   - 2^3 means 8 bytes which is the size of a mbarrier object
 // Iteration 1:
 //   - %r360 = 0
+// Iteration 2:
+//   - %r360 = 1 * 2^3
+// Iteration 3:
+//   - %r360 = 2 * 2^3
+// Iteration 4:
+//   - %r360 = 3 * 2^3
 
 	add.s32 	%r325, %r67, %r360;
-// %r325 = %r67 + 32
-// %r325 should be the last mbarrier object (totals are 5)
+// Iteration 0:
+// 	 %r325 = %r67 + 4 * 8 = %r71 (the last mbarrier object)
 // Iteration 1:
-//   %r325 points back to %r67
+//   %r325 = %r67 + 0 * 8 = %r67
+// Iteration 2:
+//   %r325 = %r67 + 1 * 8 = %r68
+// Iteration 3:
+//   %r325 = %r67 + 2 * 8 = %r69
+// Iteration 4:
+//   %r325 = %r67 + 3 * 8 = %r70
 
 	bar.sync 	0;
 
@@ -825,21 +927,34 @@ $L__BB0_3:                              // =>This Inner Loop Header: Depth=1
 
 	.loc	1 105 24                        // gemm_hopper.py:105:24
 	shl.b32 	%r361, %r430, 13;
-// %r361 = 4 * 2^13
-// Here,
-//   - 4 means 4 A/B-tiles
-//   - 2^13 means 64*64*2 bytes
+// %r361 is the stage byte offset
+// Iteration 0:
+//   %r361 = 4 * 2^13
+//   Here,
+//     - 4 means 4 A/B-tiles (4 A/B tiles were prefetched before the main loop)
+//     - 2^13 means 64*64*2 bytes
 // Iteration 1:
-//   - %r430 = 0
-//   - %r361 = 0
+//   %r361 = 0 * 2^13
+// Iteration 2:
+//   %r361 = 1 * 2^13
+// Iteration 3:
+//   %r361 = 2 * 2^13
+// Iteration 4:
+//   %r361 = 3 * 2^13
 
 	add.s32 	%r326, %r73, %r361;
 // Next shared offset for A.
 // %r73 = address of shared memory array global_smem.
-// %r326 = base_A + (4 or 0) * 64*64*2 bytes
-// which is the address of the 5th A-tile
+// Iteration 0:
+//   %r326 = base_A + (4 * 2^13), which is the address of the 5th A-tile
 // Iteration 1:
-//   %r326 = base_A
+//   %r326 = base_A + (0 * 2^13), go back to the 1st slot because it has been consumed in iter0
+// Iteration 2:
+//   %r326 = base_A + (1 * 2^13), go back to the 2nd slot because it has been consumed in iter1
+// Iteration 3:
+//   %r326 = base_A + (2 * 2^13), go back to the 3rd slot because it has been consumed in iter2
+// Iteration 4:
+//   %r326 = base_A + (3 * 2^13), go back to the 4th slot because it has been consumed in iter3
 
 	bar.sync 	0;
 
@@ -942,36 +1057,114 @@ $L__BB0_4:                              // %._crit_edge
 
 	.loc	1 111 37                        // gemm_hopper.py:111:37
 	shl.b32 	%r405, %r4, 6;
-// %r405 = tid *64.
+// %r4 = threadIdx.x
+// %r405 = tid * 2^6.
+// tid = 0 ~ 31 = d
+//   %r405 = d * 2^6
+// tid = 32 ~ 63 = 2^5 + d
+//   %r405 = 2^11 + d * 2^6
+// tid = 64 ~ 95 = 2^6 + d
+// 	 %r405 = 2^12 + d * 2^6
+// tid = 96 ~ 127 = 2^6 + 2^5 + d
+// 	 %r405 = 2^12 + 2^11 + d * 2^6
+// tid = 128 ~ 159 = 2^7 + d
+//   %r405 = 2^13 + d * 2^6
+// tid = 160 ~ 191 = 2^7 + 2^5 + d
+//   %r405 = 2^13 + 2^11 + d * 2^6
+// tid = 192 ~ 223 = 2^7 + 2^6 + d
+//   %r405 = 2^13 + 2^12 + d * 2^6
+// tid = 224 ~ 255 = 2^7 + 2^6 + 2^5 + d
+//   %r405 = 2^13 + 2^12 + 2^11 + d * 2^6
 
 	and.b32 	%r406, %r405, 14336;
-// Mask to bits.
+// 14336:
+// 00000000000000000011100000000000
+// tid = 0 ~ 31:
+//   %r406 = 0
+// tid = 32 ~ 63:
+//   %r406 = 2^11
+// tid = 64 ~ 95:
+//   %r406 = 2^12
+// tid = 96 ~ 127:
+//   %r406 = 2^12 + 2^11
+// tid = 128 ~ 159:
+//   %r406 = 2^13
+// tid = 160 ~ 191:
+//   %r406 = 2^13 + 2^11
+// tid = 192 ~ 223:
+//   %r406 = 2^13 + 2^12
+// tid = 224 ~ 255:
+//   %r406 = 2^13 + 2^12 + 2^11
+// 
+//       warp0  warp1 warp2 warp3        warp4 warp5        warp6        warp7
+// tids 0 ~ 31:
+//   %r406 = 0
+// tids 32 ~ 255: valid
+//   %r406 in [2^11, 2^12, 2^12 + 2^11, 2^13, 2^13 + 2^11, 2^13 + 2^12, 2^13 + 2^12 + 2^11]
+
 
 	and.b32 	%r407, %r4, 28;
 // tid & 28 (lower bits).
+// 28: 00000000000000000000000000011100
+// tids 0 ~ 3:
+//   %r407 = 0
+// tids 4 ~ 31: valid
+//   %r407 in [2^2, 2^3, (2^3 + 2^2), 2^4, (2^4 + 2^2), (2^4 + 2^3), (2^4 + 2^3 + 2^2)]
+// tids 32 ~ 255: 0
+//   %r407 = 0
+
 
 	shl.b32 	%r408, %r407, 5;
-// *32.
+// tids 0 ~ 3:
+//   %r408 = 0
+// tids 4 ~ 31: valid
+//   %r408 in [2^7, 2^8, (2^8 + 2^7), 2^9, (2^9 + 2^7), (2^9 + 2^8), (2^9 + 2^8 + 2^7)]
+// tids 32 ~ 255:
+//   %r408 = 0
 
 	shl.b32 	%r409, %r4, 3;
-// *8.
+// %r409 = tid * 2^3
 
 	and.b32 	%r410, %r409, 24;
-// &24.
+// %r410 = (tid * 2^3) and (2^4 + 2^3)
+// tid 0:
+//   %r410 = 0
+// tids 1 ~ 3: valid
+//   %r410 in [2^3, 2^4, 2^4 + 2^3]
+// tids 4 ~ 255:
+//   %r410 = 0
 
 	shl.b32 	%r411, %r407, 2;
-// *4.
+// tids 0 ~ 3:
+//   %r411 = 0
+// tids 4 ~ 31: valid
+//   %r411 in [2^4, 2^5, (2^5 + 2^4), 2^6, (2^6 + 2^4), (2^6 + 2^5), (2^6 + 2^5 + 2^4)]
+// tids 32 ~ 255:
+//   %r411 = 0
 
 	or.b32 	%r412, %r406, %r408;
-// Combine.
+// tids 0 ~ 3:
+//   %r412 = 0
+// tids 4 ~ 31: valid
+//   %r412 in [2^7, 2^8, (2^8 + 2^7), 2^9, (2^9 + 2^7), (2^9 + 2^8), (2^9 + 2^8 + 2^7)]
+// tids 32 ~ 255: valid
+//   %r412 in [2^11, 2^12, 2^12 + 2^11, 2^13, 2^13 + 2^11, 2^13 + 2^12, 2^13 + 2^12 + 2^11]
+
 
 	xor.b32 	%r413, %r410, %r411;
-// Swizzle.
+// tid 0:
+//   %r413 = 0
+// tids 1 ~ 31: valid
+//   %r413 in [2^3, 2^4, 2^4 + 2^3, 2^4, 2^5, (2^5 + 2^4), 2^6, (2^6 + 2^4), (2^6 + 2^5), (2^6 + 2^5 + 2^4)]
+// tids 32 ~ 255:
+//   %r413 = 0
 
 	or.b32 	%r414, %r412, %r413;
-// Final offset.
+// tid 0 ~ 255:
+//   %r414 in [0, 2^3, 2^4, 2^4 + 2^3, ..., 2^11, 2^12, 2^12 + 2^11, 2^13, 2^13 + 2^11, 2^13 + 2^12, 2^13 + 2^12 + 2^11]
 
 	add.s32 	%r415, %r73, %r414;
+// %r73 = address of shared memory array global_smem.
 // Shared addr.
 
 	st.shared.v2.b32 	[%r415], {%r431, %r432};
