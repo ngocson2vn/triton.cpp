@@ -181,10 +181,22 @@ private:
 // `pReg` and `pLane` are square layouts each with only one input and output
 // dimension. `mixedTranspositions` holds pairs of integers (i, j)
 // corresponding to the transposition (r_i l_j) of the i-th register basis
-// vector with the j-th lane basis vector.
+// vector with the j-th lane basis vector along with 16-bit selectors for byte
+// permute instructions (where each of the four nybbles is in the range [0, 7]).
+// `nPack` gives the number of basis vectors that can be used for register
+// packing while ensuring packed elements arrive at the same destination lane.
 struct DecomposedWarpConversion {
+  struct TranspositionInfo {
+    std::pair<int, int> transposition;
+    uint16_t topPreSel = 0x3210;
+    uint16_t botPreSel = 0x7654;
+    uint16_t topPostSel = 0x3210;
+    uint16_t botPostSel = 0x7654;
+  };
+
   triton::LinearLayout pReg, pLane;
-  SmallVector<std::pair<int, int>> mixedTranspositions;
+  SmallVector<TranspositionInfo> mixedTranspositions;
+  int nPack;
 };
 
 // Produces a decomposition of a permutation describing a warp-local layout
@@ -196,7 +208,7 @@ struct DecomposedWarpConversion {
 // represented as a permutation.
 DecomposedWarpConversion
 getWarpLayoutConvertDecomposition(RankedTensorType srcTy,
-                                  RankedTensorType dstTy);
+                                  RankedTensorType dstTy, int bitwidth);
 
 // Decomposes a reshape into simpler pieces.
 //
@@ -251,17 +263,6 @@ bool cvtNeedsWarpShuffle(RankedTensorType srcTy, RankedTensorType dstTy);
 // Conversion from `srcTy` to `dstTy` involves data exchange across threads,
 // warps, and possibly blocks.
 bool cvtNeedsSharedMemory(RankedTensorType srcTy, RankedTensorType dstTy);
-
-bool atomicNeedsSharedMemory(Value result);
-
-// Return true if the src and dst layout match.
-bool matchMmaV3AndDotOperandLayout(RankedTensorType srcTy,
-                                   RankedTensorType dstTy);
-
-// Check if MFMA layout can be converted to the dot operand
-// layout using warp shuffle.
-bool matchMFMAAndDotOperandShuffleCase(RankedTensorType srcTy,
-                                       RankedTensorType dstTy);
 
 // TODO: Move utility functions that belong to ConvertLayoutOp to class
 // ConvertLayoutOpHelper in the future
@@ -423,6 +424,9 @@ protected:
 };
 // Create a basic DataFlowSolver with constant and dead code analysis included.
 std::unique_ptr<DataFlowSolver> createDataFlowSolver();
+
+bool isCvtWarpSync(const triton::LinearLayout &srcLayout,
+                   const triton::LinearLayout &dstLayout);
 
 } // namespace mlir
 

@@ -10,6 +10,19 @@ Pipeline: triton ir -> triton gpu ir -> llvm dialect -> llvm ir -> ptx -> cubin<
 **2. runner**: [bin/run_add_kernel.cpp](bin/run_add_kernel.cpp)<br/>
 This is for running the cubin file generated from the triton ir file [add_kernel.ttir](./add_kernel.ttir).
 
+## Sync
+**1. Sync https://github.com/triton-lang/triton**
+  ```Bash
+  ./scripts/sync.sh
+  ```
+**2. Update `bin/RegisterTritonDialects.h`**
+  ```C++
+  // - Comment out all AMD headers
+  // - Comment out all proton headers
+  // - Comment out `namespace test`
+  // - Comment out all AMD, proton, and test calls
+  ```
+
 ## Build
 ### Prerequisites
 ```Bash
@@ -29,6 +42,11 @@ sudo ln -sf ../lib/llvm-17/bin/lldb-vscode ./lldb-dap
 # CUDA
 /usr/local/cuda-12.4
 Minimum Driver Version: 535.183.06
+
+# Update llvm-project according to `cmake/llvm-hash.txt`
+git submodule update --init --recursive
+cd llvm-project/
+git fetch origin <COMMIT_HASH>
 ```
 
 ### Run build script
