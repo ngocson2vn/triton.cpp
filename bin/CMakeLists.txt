@@ -15,6 +15,7 @@ target_link_libraries(triton_compiler PRIVATE
   # MLIR core
   MLIROptLib
   MLIRPass
+  MLIRRegisterAllPasses
   MLIRTransforms
   MLIRLLVMToLLVMIRTranslation
 

@@ -5,8 +5,8 @@ set +o noclobber
 
 
 CURRENT_DIR=$(pwd)
-echo "Destination dir = ${CURRENT_DIR}"
-TRITON_DIR=~/workspace/triton_dev/triton
+echo "CURRENT_DIR = ${CURRENT_DIR}/"
+TRITON_DIR=~/workspace/triton_dev/openai/triton
 
 #======================================================================
 # Prerequisites
@@ -23,15 +23,19 @@ TRITON_DIR=~/workspace/triton_dev/triton
 # fi
 #======================================================================
 
-rsync -avRP ${TRITON_DIR}/lib                         ${CURRENT_DIR}/
-rsync -avRP ${TRITON_DIR}/include                     ${CURRENT_DIR}/
-rsync -avRP ${TRITON_DIR}/third_party/nvidia          ${CURRENT_DIR}/
-rsync -avRP ${TRITON_DIR}/third_party/proton          ${CURRENT_DIR}/
-rsync -avRP ${TRITON_DIR}/third_party/f2reduce        ${CURRENT_DIR}/
-rsync -avRP ${TRITON_DIR}/cmake                       ${CURRENT_DIR}/
-rsync -avRP ${TRITON_DIR}/bin/*.h                     ${CURRENT_DIR}/
-rsync -avRP ${TRITON_DIR}/bin/*.txt                   ${CURRENT_DIR}/
-rsync -avRP ${TRITON_DIR}/python/src                  ${CURRENT_DIR}/
+rsync -rvP ${TRITON_DIR}/lib                         ${CURRENT_DIR}/
+rsync -rvP ${TRITON_DIR}/include                     ${CURRENT_DIR}/
+rsync -rvP ${TRITON_DIR}/third_party/nvidia          ${CURRENT_DIR}/third_party/
+rsync -rvP ${TRITON_DIR}/third_party/f2reduce        ${CURRENT_DIR}/third_party/
+rsync -rvP ${TRITON_DIR}/third_party/proton          ${CURRENT_DIR}/third_party/
+# rsync -rvP ${TRITON_DIR}/third_party/amd             ${CURRENT_DIR}/third_party/
+rsync -rvP ${TRITON_DIR}/cmake                       ${CURRENT_DIR}/
+rsync -rvP ${TRITON_DIR}/bin/*.h                     ${CURRENT_DIR}/bin/
+rsync -rvP ${TRITON_DIR}/bin/*.txt                   ${CURRENT_DIR}/bin/
+rsync -rvP ${TRITON_DIR}/python/src                  ${CURRENT_DIR}/python/
+
+git checkout CMakeLists.txt
+git checkout bin/CMakeLists.txt
 
 echo
 echo "DONE"

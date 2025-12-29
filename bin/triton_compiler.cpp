@@ -8,6 +8,8 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Transforms/Passes.h"
+#include "mlir/Conversion/Passes.h"
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Target/LLVMIR/LLVMTranslationInterface.h"
 #include "mlir/Target/LLVMIR/ModuleTranslation.h"
@@ -168,7 +170,7 @@ void optimizeLLVMModule(llvm::Module *mod, const llvm::OptimizationLevel &opt,
   llvm::ModuleAnalysisManager mam;
 
   if (arch.empty()) {
-    llvm::TargetLibraryInfoImpl TLII;
+    llvm::TargetLibraryInfoImpl TLII(mod->getTargetTriple());
     TLII.disableAllFunctions();
     fam.registerPass([TLII = std::move(TLII)] {
       return llvm::TargetLibraryAnalysis(TLII);
