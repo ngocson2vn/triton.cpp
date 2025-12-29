@@ -1059,6 +1059,8 @@ $L__BB0_4:                              // %._crit_edge
 	shl.b32 	%r405, %r4, 6;
 // %r4 = threadIdx.x
 // %r405 = tid * 2^6.
+// tid = 0:
+//   %r405 = 0
 // tid = 0 ~ 31 = d
 //   %r405 = d * 2^6
 // tid = 32 ~ 63 = 2^5 + d
@@ -1099,105 +1101,222 @@ $L__BB0_4:                              // %._crit_edge
 //       warp0  warp1 warp2 warp3        warp4 warp5        warp6        warp7
 // tids 0 ~ 31:
 //   %r406 = 0
-// tids 32 ~ 255: valid
+// tids 32 ~ 255:
 //   %r406 in [2^11, 2^12, 2^12 + 2^11, 2^13, 2^13 + 2^11, 2^13 + 2^12, 2^13 + 2^12 + 2^11]
+// 
+// => %r406 is the warp-level byte offset. Byte distance between 2 consecutive warps are 16 * (32 * 4) = 2^11
 
 
 	and.b32 	%r407, %r4, 28;
 // tid & 28 (lower bits).
-// 28: 00000000000000000000000000011100
-// tids 0 ~ 3:
-//   %r407 = 0
-// tids 4 ~ 31: valid
-//   %r407 in [2^2, 2^3, (2^3 + 2^2), 2^4, (2^4 + 2^2), (2^4 + 2^3), (2^4 + 2^3 + 2^2)]
-// tids 32 ~ 255: 0
-//   %r407 = 0
-
+// 28: 00000000000000000000000000011100 = 2^4 + 2^3 + 2^2
+// warp 0:
+//             tid 0-3 tid 4-7 tid 8-11  tid 12-15  tid 16-19  tid 20-23    tid 24-27       tid 28-31
+//   %r407 =      0      2^2     2^3    (2^3 + 2^2)    2^4    (2^4 + 2^2)  (2^4 + 2^3)  (2^4 + 2^3 + 2^2)
+// warp 1-7:
+//   %r407 repeats the same pattern as in warp 0
 
 	shl.b32 	%r408, %r407, 5;
-// tids 0 ~ 3:
+// Here, 5 means 2^5 = 32 elements
+// tid 0 ~ 3: row0 of matrix D
 //   %r408 = 0
-// tids 4 ~ 31: valid
-//   %r408 in [2^7, 2^8, (2^8 + 2^7), 2^9, (2^9 + 2^7), (2^9 + 2^8), (2^9 + 2^8 + 2^7)]
-// tids 32 ~ 255:
-//   %r408 = 0
+// tid 4 ~ 7: row1 of matrix D
+//   %r408 = 2^2 * 2^5 = 2^7 = 128 bytes (Each row of D occupies 128 bytes)
+// tid 8 ~ 11: row2 of matrix D
+//   %r408 = 2^8
+// tid 12 ~ 15: row3 of matrix D
+//   %r408 = 2^8 + 2^7
+// tid 16 ~ 19: row4 of matrix D
+//   %r408 = 2^9
+// tid 20 ~ 23: row5 of matrix D
+//   %r408 = 2^9 + 2^7
+// tid 24 ~ 27: row6 of matrix D
+//   %r408 = 2^9 + 2^8
+// tid 28 ~ 31: row7 of matrix D
+//   %r408 = 2^9 + 2^8 + 2^7
+// warp 1-7:
+//   %r407 repeats the same pattern as in warp 0
+// 
+// => %r408 is the actual byte offset for each group of 4 tids in every warp
 
 	shl.b32 	%r409, %r4, 3;
 // %r409 = tid * 2^3
+// Here, 2^3 means 8 bytes. 
+// The byte offset between 2 consecutive threads in a row is 8 bytes.
 
 	and.b32 	%r410, %r409, 24;
 // %r410 = (tid * 2^3) and (2^4 + 2^3)
-// tid 0:
-//   %r410 = 0
-// tids 1 ~ 3: valid
-//   %r410 in [2^3, 2^4, 2^4 + 2^3]
-// tids 4 ~ 255:
-//   %r410 = 0
+// tids 0 ~ 3:
+//   %r410 in [0, 2^3, 2^4, 2^4 + 2^3] <-- byte offset from the first element of row0
+// tid 4 ~ 7:
+//   %r410 = (2^2 + d) * 2^3 and (2^4 + 2^3), d = 0, 1, 2, 3
+//         = (2^5 + d*2^3) and (2^4 + 2^3)
+//   %r410 in [0, 2^3, 2^4, 2^4 + 2^3] <-- byte offset from the first element of row1
+// tid 8 ~ 11:
+//   %r410 = (2^3 + d) * 2^3 and (2^4 + 2^3), d = 0, 1, 2, 3
+//         = (2^6 + d*2^3) and (2^4 + 2^3)
+//   %r410 in [0, 2^3, 2^4, 2^4 + 2^3] <-- byte offset from the first element of row2
+// tid 12 ~ 15:
+//   %r410 = (2^3 + 2^2 + d) * 2^3 and (2^4 + 2^3), d = 0, 1, 2, 3
+//         = (2^6 + 2^5 + d*2^3) and (2^4 + 2^3)
+//   %r410 in [0, 2^3, 2^4, 2^4 + 2^3] <-- byte offset from the first element of row3
+// tid 16 ~ 19:
+//   %r410 = (2^4 + d) * 2^3 and (2^4 + 2^3), d = 0, 1, 2, 3
+//         = (2^7 + d*2^3) and (2^4 + 2^3)
+//   %r410 in [0, 2^3, 2^4, 2^4 + 2^3] <-- byte offset from the first element of row4
+// tid 20 ~ 23:
+//   %r410 = (2^4 + 2^2 + d) * 2^3 and (2^4 + 2^3), d = 0, 1, 2, 3
+//         = (2^7 + 2^5 + d*2^3) and (2^4 + 2^3)
+//   %r410 in [0, 2^3, 2^4, 2^4 + 2^3] <-- byte offset from the first element of row5
+// tid 24 ~ 27:
+//   %r410 = (2^4 + 2^3 + d) * 2^3 and (2^4 + 2^3), d = 0, 1, 2, 3
+//         = (2^7 + 2^6 + d*2^3) and (2^4 + 2^3)
+//   %r410 in [0, 2^3, 2^4, 2^4 + 2^3] <-- byte offset from the first element of row6
+// tid 28 ~ 31:
+//   %r410 = (2^4 + 2^3 + 2^2 + d) * 2^3 and (2^4 + 2^3), d = 0, 1, 2, 3
+//         = (2^7 + 2^6 + 2^5 + d*2^3) and (2^4 + 2^3)
+//   %r410 in [0, 2^3, 2^4, 2^4 + 2^3] <-- byte offset from the first element of row7
+// 
+// => %r410 is the local byte offset for each individual thread in a group of 4 tids in every warp.
+
 
 	shl.b32 	%r411, %r407, 2;
 // tids 0 ~ 3:
 //   %r411 = 0
-// tids 4 ~ 31: valid
-//   %r411 in [2^4, 2^5, (2^5 + 2^4), 2^6, (2^6 + 2^4), (2^6 + 2^5), (2^6 + 2^5 + 2^4)]
+// tid 4 ~ 7:
+//   %r411 = 2^2 * 2^2 = 2^4 (row1, bit 4 is flipped from 0 to 1)
+// tids 8 ~ 11:
+//   %r411 = 2^5 (row2, bit 5 is flipped from 0 to 1)
+// tids 12 ~ 15:
+//   %r411 = 2^5 + 2^4 (row3, bit 5-4 are flipped from 0 to 1)
+// tids 16 ~ 19:
+//   %r411 = 2^6 (row4, bit 6 are flipped from 0 to 1)
+// tids 20 ~ 23:
+//   %r411 = 2^6 + 2^4 (row5, bit 6, 4 are flipped from 0 to 1)
+// tids 24 ~ 27:
+//   %r411 = 2^6 + 2^5 (row6, bit 6, 5 are flipped from 0 to 1)
+// tids 28 ~ 31:
+//   %r411 = 2^6 + 2^5 + 2^4 (row7, bit 6-4 are flipped from 0 to 1)
 // tids 32 ~ 255:
 //   %r411 = 0
+// 
+// => %r411 holds the YYY bits for each group of 4 tids in every warp.
 
 	or.b32 	%r412, %r406, %r408;
-// tids 0 ~ 3:
-//   %r412 = 0
-// tids 4 ~ 31: valid
-//   %r412 in [2^7, 2^8, (2^8 + 2^7), 2^9, (2^9 + 2^7), (2^9 + 2^8), (2^9 + 2^8 + 2^7)]
-// tids 32 ~ 255: valid
-//   %r412 in [2^11, 2^12, 2^12 + 2^11, 2^13, 2^13 + 2^11, 2^13 + 2^12, 2^13 + 2^12 + 2^11]
+// %r406 is the warp-level byte offset. Byte offset between 2 consecutive warps are 16 * (32 * 4) = 2^11
+// %r408 is the byte offset for each group of 4 tids in every warp
+// %r412 = %r406 + %r408 (Because the lowest set bit of %r406 is bit 11 and the highest set bit of %r408 is bit 9, they are disjoint.)
+// warp 0:
+//   %r412 = %r408
+// warp 1-7:
+//   %r412 = %r406 + %r408
+// 
+// => Eventually, 
+// %r412 is the actual byte offset for each group of 4 tids in warp 0-7
 
 
 	xor.b32 	%r413, %r410, %r411;
-// tid 0:
-//   %r413 = 0
-// tids 1 ~ 31: valid
-//   %r413 in [2^3, 2^4, 2^4 + 2^3, 2^4, 2^5, (2^5 + 2^4), 2^6, (2^6 + 2^4), (2^6 + 2^5), (2^6 + 2^5 + 2^4)]
-// tids 32 ~ 255:
-//   %r413 = 0
+// %r410 is the local byte offset for each individual thread in a group of 4 tids in every warp
+// %r411 holds the YYY bits for each group of 4 tids in every warp
+// %r413 is the swizzled byte offset for each individual thread in a group of 4 tids in every warp
+
 
 	or.b32 	%r414, %r412, %r413;
-// tid 0 ~ 255:
-//   %r414 in [0, 2^3, 2^4, 2^4 + 2^3, ..., 2^11, 2^12, 2^12 + 2^11, 2^13, 2^13 + 2^11, 2^13 + 2^12, 2^13 + 2^12 + 2^11]
+// %r412 is the actual byte offset for each group of 4 tids in warp 0-7
+// %r413 is the swizzled byte offset for each individual thread in a group of 4 tids in every warp
+// %r414 is the final byte offset for each individual thread 0-255
 
 	add.s32 	%r415, %r73, %r414;
 // %r73 = address of shared memory array global_smem.
-// Shared addr.
+// tid 4:
+//   - logical offset = 2^7 (128 bytes strided from row0 because row0 occupies 128 bytes)
+//   - swizzled offset = %r414 = 2^7 + 2^4 (since bit 7 is 1, then bit 4 is flipped to 1)
+//   - physical address = %r415 = %r73 + 2^7 + 2^4
+// tid 5:
+//   - logical offset = 2^7 + 2^3 (+2^3 means next 8 bytes following T4)
+//   - swizzled offset = %r414 = 2^7 + 2^4 + 2^3 (since bit 7 is 1, then bit 4 is flipped to 1)
+//   - physical address = %r415 = %r73 + 2^7 + 2^4 + 2^3 
+// tid 6:
+//   - logical offset = 2^7 + 2^3 + 2^3 = 2^7 + 2^4 (+2^3 means next 8 bytes following T5)
+//   - swizzled offset = %r414 = 2^7 + 0 (since bit 7 is 1, then bit 4 is flipped from 1 to 0)
+//   - physical address = %r415 = %r73 + 2^7
+// tid 7:
+//   - logical offset = 2^7 + 2^4 + 2^3 (+2^3 means next 8 bytes following T6)
+//   - swizzled offset = %r414 = 2^7 + 0 + 2^3 (since bit 7 is 1, then bit 4 is flipped from 1 to 0)
+//   - physical address = %r415 = %r73 + 2^7 + 2^3
 
 	st.shared.v2.b32 	[%r415], {%r431, %r432};
+// Base of [%r415] is global_smem, i.e., re-use the first A-tile's shared memory region 
 // Store two f32 accums.
+// {d0, d1} = {%r431, %r432}
+// tid 0:
+//   D[0][0] = d0 = %r431
+//   D[0][1] = d1 = %r432
+// tid 4:
+//   D[1][0] = d0 = %r431 (bank 4)
+//   D[1][1] = d1 = %r432 (bank 5)
 
 	st.shared.v2.b32 	[%r415+1024], {%r433, %r434};
-// +1024 (next row?).
+// 1024 = 8 rows * 32 cols * 4 bytes
+// {d2, d3} = {%r433, %r434}
+// D[8][0] = d2 = %r433
+// D[8][1] = d3 = %r434
 
 	xor.b32 	%r416, %r414, 32;
-// Next bank or swizzle.
+// Move to D[32 / 4]
+// tid 0:
+//   %r414 = 0
+//   %r416 = 0 xor 32 = 0 + 32 = 32
+// Here, 32 means 32 bytes which is the byte offset of next pair {d4, d5}
+// D[0][8] = D[0][0] + 4 * (4 + 4) bytes
 
 	add.s32 	%r417, %r73, %r416;
+// D[0][8] = D[0][0] + 32 bytes
 
 	st.shared.v2.b32 	[%r417], {%r435, %r436};
+// {d4, d5} = {%r435, %r436}
+// D[0][8] = d4 = %r435
+// D[0][9] = d5 = %r436
 
 	st.shared.v2.b32 	[%r417+1024], {%r437, %r438};
+// Move to D[8][8]
+// {d6, d7} = {%r437, %r438}
+// D[8][8] = d6 = %r437
+// D[8][9] = d7 = %r438
 
 	xor.b32 	%r418, %r414, 64;
+// Offset to D[0[64 / 4]
 
 	add.s32 	%r419, %r73, %r418;
+// Move to D[0[64 / 4]
 
 	st.shared.v2.b32 	[%r419], {%r439, %r440};
+// {d8, d9} = {%r439, %r440}
+// D[0][16] = d8 = %r439
+// D[0][17] = d9 = %r440
 
 	st.shared.v2.b32 	[%r419+1024], {%r441, %r442};
+// Move to D[8][16]
+// {d10, d11} = {%r441, %r442}
+// D[8][16] = d10 = %r441
+// D[8][17] = d11 = %r442
 
 	xor.b32 	%r420, %r414, 96;
+// Offset to D[0][96 / 4]
 
 	add.s32 	%r421, %r73, %r420;
+// Move to D[0][96 / 4]
 
 	st.shared.v2.b32 	[%r421], {%r443, %r444};
+// {d12, d13} = {%r443, %r444}
+// D[0][24] = d12 = %r443
+// D[0][25] = d13 = %r444
 
 	st.shared.v2.b32 	[%r421+1024], {%r445, %r446};
-// Storing the 16 f32 accumulators (likely 4x4 or swizzled) into shared memory with bank conflict avoidance.
+// Move to D[8][24]
+// {d14, d15} = {%r445, %r446}
+// D[8][24] = d14 = %r445
+// D[8][25] = d15 = %r446
 
 	// begin inline asm
 	fence.proxy.async.shared::cta;
@@ -1236,7 +1355,22 @@ $L__BB0_4:                              // %._crit_edge
 	// begin inline asm
 	@%p61 cp.async.bulk.tensor.2d.global.shared::cta.bulk_group [%rd33, {%r401, %r402}], [%r403];
 	// end inline asm
-// Copy from shared [%r403] to global [%rd33 + {N_offset, M_offset}], bulk tensor. This stores the result tile to C.
+// Copy from shared [%r403] to global [%rd33 + {N_offset, M_offset}], bulk tensor. This stores the result tile to D.
+// The matrix D in shared memory has a row-major layout as follows:
+// -----------
+// | 64x32   |
+// -----------
+// | 64x32   |
+// -----------
+// This instruction will be executed 2 times: 
+//   - 1st by a leader thread in warp0 which copies the upper 64x32 tile
+//   - 2nd by a leader thread in warp1 which copies the lower 64x32 tile
+// Eventually, the matrix D in global memory has a row-major layout of 64x64 as follows:
+// ---------------------
+// | 64x32   | 64x32   |
+// ---------------------
+// %rd33 is a CUtensorMap object with boxDim 64x32 (not 64x64)
+// Triton creates CUtensorMap objects before launching this GEMM kernel
 
 	cp.async.bulk.commit_group;
 
