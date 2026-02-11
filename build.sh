@@ -8,6 +8,12 @@ mkdir -p ${ROOT_DIR}/build
 
 git submodule update --init --recursive
 
+if [ -z ${CUDA_VERSION} ]; then
+  echo "CUDA_VERSION is empty! Please export it."
+  exit 1
+fi
+export CUDA_HOME=/usr/local/cuda-${CUDA_VERSION}
+echo "CUDA_HOME=${CUDA_HOME}"
 
 pre_hash=""
 if [ -f ${ROOT_DIR}/.cmake.sha256 ]; then

@@ -51,6 +51,7 @@ git fetch origin <COMMIT_HASH>
 
 ### Run build script
 ```
+export CUDA_VERSION=xxx
 ./build.sh
 ```
 
