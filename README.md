@@ -23,6 +23,13 @@ This is for running the cubin file generated from the triton ir file [add_kernel
   // - Comment out all AMD, proton, and test calls
   ```
 
+**3. Update llvm-project**
+```Bash
+cd llvm-project/
+COMMIT_HASH=$(cat ./cmake/llvm-hash.txt)
+git fetch origin ${COMMIT_HASH}
+```
+
 ## Build
 ### Prerequisites
 ```Bash
@@ -46,6 +53,7 @@ Minimum Driver Version: 535.183.06
 # Update llvm-project according to `cmake/llvm-hash.txt`
 git submodule update --init --recursive
 cd llvm-project/
+COMMIT_HASH=$(cat ./cmake/llvm-hash.txt)
 git fetch origin <COMMIT_HASH>
 ```
 

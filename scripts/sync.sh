@@ -6,7 +6,10 @@ set +o noclobber
 
 CURRENT_DIR=$(pwd)
 echo "CURRENT_DIR = ${CURRENT_DIR}/"
-TRITON_DIR=~/workspace/triton_dev/openai/triton
+if [ -z ${TRITON_DIR} ]; then
+  echo "TRITON_DIR is empty! Please export it!"
+  exit 1
+fi
 
 #======================================================================
 # Prerequisites

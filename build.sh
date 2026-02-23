@@ -6,7 +6,7 @@ ROOT_DIR=$(pwd)
 echo "ROOT_DIR=${ROOT_DIR}"
 mkdir -p ${ROOT_DIR}/build
 
-git submodule update --init --recursive
+# git submodule update --init --recursive
 
 if [ -z ${CUDA_VERSION} ]; then
   echo "CUDA_VERSION is empty! Please export it."

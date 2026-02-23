@@ -66,11 +66,73 @@
 #include <fcntl.h>
 #include <errno.h>
 
+// CUDA
+#include <cuda.h>
+#include <cuda_runtime.h>
+
+#define CUDA_CHECK_ABORT(cuCall) \
+do { \
+  CUresult res = cuCall; \
+  if (res != CUDA_SUCCESS) { \
+    const char* errMsg; \
+    cuGetErrorString(res, &errMsg); \
+    fprintf(stderr,  "%s:%d: CUDA Error: %s\n", __FILE__, __LINE__, errMsg); \
+    std::abort(); \
+  } \
+} while (0)
+
 using namespace mlir;
 
 static llvm::cl::opt<std::string> inputFilename(
     llvm::cl::Positional, llvm::cl::desc("<input file>"),
     llvm::cl::init("-"));
+
+static int getComputeCapability() {
+  CUDA_CHECK_ABORT(cuInit(0));
+
+  CUdevice device;
+  CUDA_CHECK_ABORT(cuDeviceGet(&device, 0));
+
+  int major = 0;
+  int minor = 0;
+  CUDA_CHECK_ABORT(
+    cuDeviceGetAttribute(
+      &major, 
+      CUdevice_attribute_enum::CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR,
+      device
+    ));
+  CUDA_CHECK_ABORT(
+    cuDeviceGetAttribute(
+      &minor, 
+      CUdevice_attribute_enum::CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR,
+      device
+    ));
+
+  int cc = major * 10 + minor;
+  fprintf(stdout, "INFO Device Compute Capability: %d\n", cc);
+
+  return cc;
+}
+
+static std::string getSupportedPtxVersion() {
+  int cudaRuntimeVersion;
+  cudaError_t err = cudaRuntimeGetVersion(&cudaRuntimeVersion);
+  if (err != cudaError::cudaSuccess) {
+    return std::string("");
+  }
+
+  int major = cudaRuntimeVersion / 1000;
+  int minor = (cudaRuntimeVersion % 1000) / 10;
+
+  if (major >= 11) {
+    major -= 4;
+  }
+
+  std::string ptxVersion = std::to_string(major).append(std::to_string(minor));
+  fprintf(stdout, "INFO Supported PTX version: %s\n", ptxVersion.c_str());
+
+  return ptxVersion;
+}
 
 namespace llvm {
 struct BreakStructPhiNodesPass : PassInfoMixin<BreakStructPhiNodesPass> {
@@ -516,11 +578,15 @@ int main(int argc, char **argv) {
   output->keep();
 
   // Common variables
-  int capability = 86;
+  int capability = getComputeCapability();
   std::string arch = "sm_";
   arch.append(std::to_string(capability));
+  if (capability >= 90) {
+    arch.append("a");
+  }
+
   std::string features = "+ptx";
-  features.append(std::to_string(capability));
+  features.append(getSupportedPtxVersion());
   std::string triple = "nvptx64-nvidia-cuda";
 
   //===========================================================================
@@ -531,8 +597,8 @@ int main(int argc, char **argv) {
   pm.addPass(mlir::triton::gpu::createTritonGPUCoalesce());
   pm.addPass(mlir::triton::gpu::createTritonGPUF32DotTC());
 
-  auto cluster_info = mlir::triton::nvidia_gpu::ClusterInfo();
-  pm.addPass(mlir::triton::nvidia_gpu::createTritonNvidiaGPUPlanCTAPass(&cluster_info));
+  // auto cluster_info = mlir::triton::nvidia_gpu::ClusterInfo();
+  pm.addPass(mlir::triton::nvidia_gpu::createTritonNvidiaGPUPlanCTAPass());
 
   pm.addPass(mlir::triton::gpu::createTritonGPURemoveLayoutConversions());
   pm.addPass(mlir::triton::gpu::createTritonGPUOptimizeThreadLocality());
@@ -703,6 +769,10 @@ int main(int argc, char **argv) {
   //===========================================================================
   std::filesystem::path currentPath = std::filesystem::current_path();
   std::string ptxasPath = currentPath.string() + "/third_party/nvidia/backend/bin/ptxas";
+  if (capability >= 100) {
+    ptxasPath.append("-blackwell");
+  }
+
   std::string outputPtxFile = currentPath.string() + "/output.ptx";
   std::string outputCubinFile = currentPath.string() + "/output.cubin";
   std::ofstream ptxOs(outputPtxFile, std::ios::out | std::ios::binary);

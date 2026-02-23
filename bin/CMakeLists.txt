@@ -2,6 +2,22 @@ get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
 get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
 get_property(triton_libs GLOBAL PROPERTY TRITON_LIBS)
 
+# Find the CUDA libraries
+find_library(CUDA_DRIVER
+  NAMES cuda
+  PATHS /usr/lib/x86_64-linux-gnu
+  PATH_SUFFIXES lib
+  NO_DEFAULT_PATH
+)
+message(STATUS "CUDA_DRIVER: ${CUDA_DRIVER}")
+
+find_library(CUDA_RUNTIME
+  NAMES cudart
+  PATHS ${CUDA_HOME}/lib64
+  PATH_SUFFIXES lib
+  NO_DEFAULT_PATH
+)
+message(STATUS "CUDA_RUNTIME: ${CUDA_RUNTIME}")
 
 # triton_compiler
 add_llvm_executable(triton_compiler triton_compiler.cpp PARTIAL_SOURCES_INTENDED)
@@ -27,22 +43,17 @@ target_link_libraries(triton_compiler PRIVATE
   LLVMX86TargetMCA
   LLVMX86Desc
   LLVMX86Info
+
+  # CUDA
+  ${CUDA_RUNTIME}
+  ${CUDA_DRIVER}
 )
 
 mlir_check_all_link_libraries(triton_compiler)
-
-# Find the CUDA library
-find_library(CUDA_LIBRARY
-  NAMES cuda
-  PATHS /usr/lib/x86_64-linux-gnu
-  PATH_SUFFIXES lib
-  NO_DEFAULT_PATH
-)
-message(STATUS "CUDA_LIBRARY: ${CUDA_LIBRARY}")
 
 add_executable(run_add_kernel run_add_kernel.cpp)
 target_compile_options(run_add_kernel PRIVATE -fno-rtti -g -O0)
 target_link_libraries(run_add_kernel PRIVATE
   runtime
-  ${CUDA_LIBRARY}
+  ${CUDA_DRIVER}
 )
