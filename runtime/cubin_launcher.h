@@ -155,35 +155,33 @@ class CubinLauncher {
       return false;
     }
 
-    // Copy input data to device
-    std::vector<DevicePtr> devInputs;
-    for (int i = 0; i < inputs.size(); i++) {
-      CUdeviceptr devPtr;
-      CUDA_CHECK_RET_FALSE(cuMemAlloc(&devPtr, inputSizes[i]));
-      devInputs.emplace_back(devPtr);
-      CUDA_CHECK_RET_FALSE(cuMemcpyHtoD(devInputs[i].get(), inputs[i], inputSizes[i]));
-    }
+    // Copy A and B to device
+    CUdeviceptr a_dev_ptr;
+    CUDA_CHECK_RET_FALSE(cuMemAlloc(&a_dev_ptr, inputSizes[0]));
+    CUDA_CHECK_RET_FALSE(cuMemcpyHtoD(a_dev_ptr, inputs[0], inputSizes[0]));
 
-    std::vector<DevicePtr> devOutputs;  
-    CUdeviceptr devPtr;
-    CUDA_CHECK_RET_FALSE(cuMemAlloc(&devPtr, outputSizes[0]));
-    devOutputs.emplace_back(devPtr);
+    CUdeviceptr b_dev_ptr;
+    CUDA_CHECK_RET_FALSE(cuMemAlloc(&b_dev_ptr, inputSizes[1]));
+    CUDA_CHECK_RET_FALSE(cuMemcpyHtoD(b_dev_ptr, inputs[1], inputSizes[1]));
+
+    CUdeviceptr d_dev_ptr;
+    CUDA_CHECK_RET_FALSE(cuMemAlloc(&d_dev_ptr, outputSizes[0]));
 
     // Create tensor maps
     CUtensorMap a_tensor_map{};
-    bool status_A = create_tensor_map<ABType, 3>(&a_tensor_map, reinterpret_cast<void*>(devInputs[0].get()), M, K, M_TILE, K_TILE); // BOX_COLS = 64
+    bool status_A = create_tensor_map<ABType, 3>(&a_tensor_map, reinterpret_cast<void*>(a_dev_ptr), M, K, M_TILE, K_TILE); // BOX_COLS = 64
     if (!status_A) {
       return EXIT_FAILURE;
     }
 
     CUtensorMap b_tensor_map{};
-    bool status_B = create_tensor_map<ABType, 3>(&b_tensor_map, reinterpret_cast<void*>(devInputs[1].get()), N, K, N_TILE, K_TILE); // BOX_COLS = 64
+    bool status_B = create_tensor_map<ABType, 3>(&b_tensor_map, reinterpret_cast<void*>(b_dev_ptr), N, K, N_TILE, K_TILE); // BOX_COLS = 64
     if (!status_B) {
       return EXIT_FAILURE;
     }
 
     CUtensorMap d_tensor_map{};
-    bool status_D = create_tensor_map<DType, 3>(&d_tensor_map, reinterpret_cast<void*>(devOutputs[0].get()), M, N, M_TILE, N_TILE);
+    bool status_D = create_tensor_map<DType, 3>(&d_tensor_map, reinterpret_cast<void*>(d_dev_ptr), M, N, M_TILE, N_TILE);
     if (!status_D) {
       return EXIT_FAILURE;
     }
@@ -209,9 +207,6 @@ class CubinLauncher {
     // 	.param .u64 .ptr .global .align 1 triton_dot_param_16
     // )
 
-    // NOTE: MUST keep devInputs and devOutputs unchanged from now on.
-    // Otherwise, device pointers may be moved to different locations which leads to 
-    // undefined bahavior.
     std::unique_ptr<void*> kernelArgsPtr(new void*[inputs.size() + outputs.size() + 4*3 + 2]);
     void** kernelArgs = kernelArgsPtr.get();
     uint32_t u32_dummy_arg = 0;
@@ -240,8 +235,8 @@ class CubinLauncher {
     kernelArgs[argIdx++] = &u64_dummy_arg;
 
     CUdeviceptr devDummy1;
-    kernelArgs[argIdx++] = &devDummy1;
     CUdeviceptr devDummy2;
+    kernelArgs[argIdx++] = &devDummy1;
     kernelArgs[argIdx++] = &devDummy2;
 
     // Set up kernel launch parameters
@@ -259,7 +254,7 @@ class CubinLauncher {
     CUDA_CHECK_RET_FALSE(cuCtxSynchronize());
 
     // Copy results back to host
-    CUDA_CHECK_RET_FALSE(cuMemcpyDtoH(outputs[0], devOutputs[0].get(), outputSizes[0]));
+    CUDA_CHECK_RET_FALSE(cuMemcpyDtoH(outputs[0], d_dev_ptr, outputSizes[0]));
 
     return true;
   }
