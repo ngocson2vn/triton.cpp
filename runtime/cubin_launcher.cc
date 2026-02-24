@@ -7,41 +7,7 @@
 
 #include "cubin_launcher.h"
 
-// Error checking macro
-#define CUDA_CHECK(cuCall) \
-do { \
-  CUresult res = cuCall; \
-  if (res != CUDA_SUCCESS) { \
-    const char* errMsg; \
-    cuGetErrorString(res, &errMsg); \
-    fprintf(stderr, __FILE__ ":" TO_STR(__LINE__) " CUDA Error: %s\n", errMsg); \
-    return EXIT_FAILURE; \
-  } \
-} while (0)
-
-#define CUDA_CHECK_RET_FALSE(cuCall) \
-do { \
-  CUresult res = cuCall; \
-  if (res != CUDA_SUCCESS) { \
-    const char* errMsg; \
-    cuGetErrorString(res, &errMsg); \
-    fprintf(stderr, __FILE__ ":" TO_STR(__LINE__) " CUDA Error: %s\n", errMsg); \
-    return false; \
-  } \
-} while (0)
-
-#define CUDA_CHECK_RET_NULL(cuCall) \
-do { \
-  CUresult res = cuCall; \
-  if (res != CUDA_SUCCESS) { \
-    const char* errMsg; \
-    cuGetErrorString(res, &errMsg); \
-    fprintf(stderr, __FILE__ ":" TO_STR(__LINE__) " CUDA Error: %s\n", errMsg); \
-    return nullptr; \
-  } \
-} while (0)
-
-namespace cubin {
+namespace rt {
 
 class CuCtxKeeper final {
  public:
@@ -100,53 +66,6 @@ class CudaInitializer {
 };
 
 static CudaInitializer _cudaInit;
-
-class DevicePtr {
- public:
-  // Allow custom constructor
-  DevicePtr(CUdeviceptr ptr) : ptr_(ptr) {
-    fprintf(stdout, "Allocated device ptr_ %llu\n", ptr_);
-  }
-
-  // Allow move constructor
-  DevicePtr(DevicePtr&& rhs) noexcept {
-    // By default, ptr_ is initialized to 0
-    std::swap(ptr_, rhs.ptr_);
-    fprintf(stdout, "DevicePtr move ctor ptr_ %llu rhs.ptr_ %llu\n", ptr_, rhs.ptr_);
-  }
-
-  // Forbid default constructor
-  DevicePtr() = delete;
-
-  // Forbid copy constructor
-  DevicePtr(const DevicePtr& rhs) = delete;
-
-  // Forbid copy assignment operator
-  DevicePtr& operator=(const DevicePtr& rhs) = delete;
-
-  // Forbid move assignment operator
-  DevicePtr& operator=(DevicePtr&& rhs) = delete;
-
-  ~DevicePtr() {
-    if (ptr_) {
-      CUresult res = cuMemFree(ptr_);
-      if (res != CUDA_SUCCESS) {
-        const char* errMsg;
-        cuGetErrorString(res, &errMsg);
-        fprintf(stderr, "Failed to free device ptr %llu, error: %s\n", ptr_, errMsg);
-      } else {
-        fprintf(stdout, "Successfully free device ptr %llu\n", ptr_);
-      }
-    }
-  }
-
-  CUdeviceptr& get() {
-    return ptr_;
-  }
-
- private:
-  CUdeviceptr ptr_ = 0;
-};
 
 
 CubinLoader::CubinLoader(const std::string& cubinFile) : cubinFile_(cubinFile) {
@@ -264,4 +183,4 @@ bool CubinLauncher::launchKernel(
   return true;
 }
 
-}  // namespace cubin
+}  // namespace rt

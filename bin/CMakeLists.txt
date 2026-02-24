@@ -57,3 +57,10 @@ target_link_libraries(run_add_kernel PRIVATE
   runtime
   ${CUDA_DRIVER}
 )
+
+add_executable(run_triton_dot_kernel run_triton_dot_kernel.cpp)
+target_compile_options(run_triton_dot_kernel PRIVATE -fno-rtti -g -O0)
+target_link_libraries(run_triton_dot_kernel PRIVATE
+  runtime
+  ${CUDA_DRIVER}
+)

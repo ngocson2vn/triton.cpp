@@ -20,7 +20,7 @@ int main(int argc, char** argv) {
       fprintf(stderr, "numElements should be a positive integer number.");
     }
   } catch (std::exception& ex) {
-    fprintf(stderr, "Failed to parse BLOCK_SIZE, error: %s\n", ex.what());
+    fprintf(stderr, "Failed to parse numElements, error: %s\n", ex.what());
     return EXIT_FAILURE;
   }
 
@@ -71,7 +71,7 @@ int main(int argc, char** argv) {
   outputSizes.push_back(numElements * sizeof(float));
 
   // An uniform runtime API
-  cubin::CubinLauncher launcher(cubinFile);
+  rt::CubinLauncher launcher(cubinFile);
   bool ok = launcher.launchKernel(kernelName, inputs, inputSizes, outputs, outputSizes, numElements, blockSize);
   if (!ok) {
     return EXIT_FAILURE;

@@ -589,6 +589,9 @@ int main(int argc, char **argv) {
   features.append(getSupportedPtxVersion());
   std::string triple = "nvptx64-nvidia-cuda";
 
+  int major_cc = capability / 10;
+  int num_stages = 3;
+
   //===========================================================================
   // make_ttgir
   //===========================================================================
@@ -606,53 +609,63 @@ int main(int argc, char **argv) {
   pm.addPass(mlir::triton::gpu::createTritonGPURemoveLayoutConversions());
   pm.addPass(mlir::triton::gpu::createTritonGPUOptimizeDotOperands({true}));
   pm.addPass(mlir::triton::gpu::createTritonGPURemoveLayoutConversions());
-
   pm.addPass(mlir::triton::nvidia_gpu::createTritonNvidiaGPUOptimizeDescriptorEncodingPass());
-
   pm.addPass(mlir::triton::createTritonLoopAwareCSE());
 
-  pm.addPass(mlir::triton::gpu::createTritonGPUFuseNestedLoops());
-  pm.addPass(mlir::createCanonicalizerPass());
+  if (major_cc == 8 || major_cc == 9) {
+    pm.addPass(mlir::triton::gpu::createTritonGPUFuseNestedLoops());
+    pm.addPass(mlir::createCanonicalizerPass());
+    pm.addPass(mlir::triton::createTritonLoopInvariantCodeMotion());
+    pm.addPass(mlir::createCanonicalizerPass());
+    pm.addPass(mlir::triton::gpu::createTritonGPUCombineTensorSelectAndIf());
+    pm.addPass(mlir::createNVGPUWarpSpecialization({num_stages, true}));
+    pm.addPass(mlir::triton::gpu::createTritonGPUAssignLatencies({num_stages}));
+    pm.addPass(mlir::triton::gpu::createTritonGPUScheduleLoops());
+    pm.addPass(mlir::triton::gpu::createTritonGPUPipeline({num_stages, true}));
+  } else if (major_cc >= 10) {
+    pm.addPass(mlir::triton::gpu::createTritonGPUFuseNestedLoops());
+    pm.addPass(mlir::createCanonicalizerPass());
+    pm.addPass(mlir::triton::createTritonLoopInvariantCodeMotion());
+    pm.addPass(mlir::triton::gpu::createTritonGPUOptimizeAccumulatorInit());
+    pm.addPass(mlir::triton::gpu::createTritonGPUHoistTMEMAlloc({false}));
+    pm.addPass(mlir::triton::nvidia_gpu::createTritonNvidiaGPUPromoteLHSToTMemPass());
+    pm.addPass(mlir::triton::gpu::createTritonGPUAssignLatencies({num_stages}));
+    pm.addPass(mlir::triton::gpu::createTritonGPUScheduleLoops());
+    pm.addPass(mlir::triton::gpu::createTritonGPUAutomaticWarpSpecialization({num_stages}));
+    pm.addPass(mlir::triton::gpu::createTritonGPUPipeline({num_stages, true}));
+    pm.addPass(mlir::triton::gpu::createTritonGPUOptimizePartitionWarps());
+    pm.addPass(mlir::triton::gpu::createTritonGPUCombineTensorSelectAndIf());
+    
+    // hoist again and allow hoisting out of if statements
+    pm.addPass(mlir::triton::gpu::createTritonGPUHoistTMEMAlloc({true}));
 
-  pm.addPass(mlir::triton::createTritonLoopInvariantCodeMotion());
-  pm.addPass(mlir::createCanonicalizerPass());
+    pm.addPass(mlir::triton::nvidia_gpu::createTritonNvidiaGPURemoveTMEMTokensPass());
+  } else {
+    pm.addPass(mlir::triton::createTritonLoopInvariantCodeMotion());
+  }
 
-  pm.addPass(mlir::triton::gpu::createTritonGPUCombineTensorSelectAndIf());
-
-  int num_stages = 3;
-  pm.addPass(mlir::createNVGPUWarpSpecialization({num_stages, true}));
-
-  pm.addPass(mlir::triton::gpu::createTritonGPUAssignLatencies({num_stages}));
-  pm.addPass(mlir::triton::gpu::createTritonGPUScheduleLoops());
-  pm.addPass(mlir::triton::gpu::createTritonGPUPipeline({num_stages, true}));
   pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(mlir::triton::createTritonLoopAwareCSE());
-  
   pm.addPass(mlir::triton::gpu::createTritonGPUPrefetch());
   pm.addPass(mlir::triton::gpu::createTritonGPUOptimizeDotOperands({true}));
   pm.addPass(mlir::triton::gpu::createTritonGPUCoalesceAsyncCopy());
-
   pm.addPass(mlir::triton::nvidia_gpu::createTritonNvidiaGPUOptimizeTMemLayoutsPass());
 
+  if (major_cc >= 9) {
+    pm.addPass(mlir::triton::nvidia_gpu::createTritonNvidiaGPUTMALoweringPass());
+  }
+
   pm.addPass(mlir::triton::gpu::createTritonGPURemoveLayoutConversions());
-
   pm.addPass(mlir::triton::nvidia_gpu::createTritonNvidiaGPUInterleaveTMemPass());
-
   pm.addPass(mlir::triton::gpu::createTritonGPUReduceDataDuplication());
   pm.addPass(mlir::triton::gpu::createTritonGPUReorderInstructions());
   pm.addPass(mlir::triton::createTritonLoopAwareCSE());
   pm.addPass(mlir::createSymbolDCEPass());
-
-  {
-    mlir::triton::nvidia_gpu::TritonGPUFenceInsertionOptions options;
-    options.computeCapability = capability;
-    pm.addPass(mlir::triton::nvidia_gpu::createTritonGPUFenceInsertion(options));
-  }
-
+  pm.addPass(mlir::triton::nvidia_gpu::createTritonGPUFenceInsertion({capability}));
   pm.addPass(mlir::triton::nvidia_gpu::createTritonNvidiaGPUMMALoweringPass());
   pm.addPass(mlir::createSCCPPass());
   pm.addPass(mlir::createCanonicalizerPass());
-  
+
   //===========================================================================
   // make_llir
   //===========================================================================
@@ -663,23 +676,15 @@ int main(int argc, char **argv) {
   pm.addPass(mlir::triton::gpu::createAllocateSharedMemory());
   pm.addPass(mlir::triton::nvidia_gpu::createTritonTensorMemoryAllocationPass());
   pm.addPass(mlir::triton::gpu::createTritonGPUGlobalScratchAllocationPass());
-
-  {
-    mlir::triton::nvidia_gpu::TritonGPUProxyFenceInsertionOptions options;
-    options.computeCapability = capability;
-    pm.addPass(mlir::triton::nvidia_gpu::createTritonGPUProxyFenceInsertion(options));
-  }
-  
+  pm.addPass(mlir::triton::nvidia_gpu::createTritonGPUProxyFenceInsertion({capability}));
   pm.addPass(mlir::triton::createConvertTritonGPUToLLVMPass(capability, ptxVersion));
   pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(mlir::createCSEPass());
-
   pm.addPass(mlir::triton::createConvertNVGPUToLLVM());
   pm.addPass(mlir::triton::createConvertWarpSpecializeToLLVM());
   pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(mlir::createCSEPass());
   pm.addPass(mlir::createSymbolDCEPass());
-
   pm.addPass(mlir::createConvertNVVMToLLVMPass());
 
   // Apply the pass

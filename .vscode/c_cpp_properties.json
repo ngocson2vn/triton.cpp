@@ -4,6 +4,8 @@
             "name": "Linux",
             "includePath": [
                 "/usr/local/cuda-12.4/include",
+                "/usr/local/cuda-12.8/include",
+                "/usr/local/cuda-13.1/include",
                 "${workspaceFolder}",
                 "${workspaceFolder}/include",
                 "${workspaceFolder}/bin",
@@ -27,6 +29,8 @@
             "browse": {
                 "path": [
                     "/usr/local/cuda-12.4/include",
+                    "/usr/local/cuda-12.8/include",
+                    "/usr/local/cuda-13.1/include",
                     "${workspaceFolder}/include",
                     "${workspaceFolder}/lib",
                     "${workspaceFolder}/bin",
