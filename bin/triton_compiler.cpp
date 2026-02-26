@@ -677,7 +677,13 @@ int main(int argc, char **argv) {
   pm.addPass(mlir::triton::nvidia_gpu::createTritonTensorMemoryAllocationPass());
   pm.addPass(mlir::triton::gpu::createTritonGPUGlobalScratchAllocationPass());
   pm.addPass(mlir::triton::nvidia_gpu::createTritonGPUProxyFenceInsertion({capability}));
+
+  // This is a combo pass implemented in `third_party/nvidia/lib/TritonNVIDIAGPUToLLVM/TritonGPUToLLVM.cpp` 
+  // which includes the following conversion patterns
+  // 1. Patterns for converting ttg -> llvm, which is implemented in `lib/Conversion/TritonGPUToLLVM/`
+  // 2. Patterns for converting ttng -> llvm, which is implemented in `third_party/nvidia/lib/TritonNVIDIAGPUToLLVM/`
   pm.addPass(mlir::triton::createConvertTritonGPUToLLVMPass(capability, ptxVersion));
+
   pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(mlir::createCSEPass());
   pm.addPass(mlir::triton::createConvertNVGPUToLLVM());
@@ -757,6 +763,11 @@ int main(int argc, char **argv) {
   llvm::outs() << "=================================================\n";
   llvm::outs() << *llvmMod << "\n";
 
+  output->os() << "// =================================================\n";
+  output->os() << "// LLVM IR\n";
+  output->os() << "// =================================================\n";
+  llvmMod->print(output->os(), nullptr);
+
 
   //===========================================================================
   // make_ptx
@@ -768,6 +779,11 @@ int main(int argc, char **argv) {
   llvm::outs() << "=================================================\n";
   llvm::outs() << ptx << "\n";
 
+  output->os() << "\n\n";
+  output->os() << "// =================================================\n";
+  output->os() << "// PTX\n";
+  output->os() << "// =================================================\n";
+  output->os() << ptx << "\n";
 
   //===========================================================================
   // make_cubin

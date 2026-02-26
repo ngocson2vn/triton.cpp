@@ -3268,3 +3268,435 @@ module attributes {ttg.global_scratch_memory_alignment = 1 : i32, ttg.global_scr
 }
 
 
+// =================================================
+// LLVM IR
+// =================================================
+; ModuleID = 'LLVMDialectModule'
+source_filename = "LLVMDialectModule"
+target datalayout = "e-p3:32:32-p4:32:32-p5:32:32-p6:32:32-p7:32:32-i64:64-i128:128-i256:256-v16:16-v32:32-n16:32:64"
+
+@global_smem = external addrspace(3) global [0 x i8], align 16
+
+; Function Attrs: nounwind
+define ptx_kernel void @triton_dot(ptr byval([128 x i8]) align 64 "nvvm.grid_constant" %0, i32 %1, i32 %2, i64 %3, i64 %4, ptr byval([128 x i8]) align 64 "nvvm.grid_constant" %5, i32 %6, i32 %7, i64 %8, i64 %9, ptr byval([128 x i8]) align 64 "nvvm.grid_constant" %10, i32 %11, i32 %12, i64 %13, i64 %14, ptr addrspace(1) readnone captures(none) %15, ptr addrspace(1) readnone captures(none) %16) local_unnamed_addr #0 {
+  %18 = tail call i32 @llvm.nvvm.read.ptx.sreg.tid.x()
+  %19 = icmp samesign ult i32 %18, 32
+  tail call void asm sideeffect "@$0 tcgen05.alloc.cta_group::1.sync.aligned.shared::cta.b32 [$1], 32;", "b,r"(i1 %19, ptr addrspace(3) @global_smem) #6
+  tail call void @llvm.nvvm.barrier.cta.sync.aligned.all(i32 0)
+  %20 = load i32, ptr addrspace(3) @global_smem, align 16
+  tail call void @llvm.nvvm.barrier.cta.sync.aligned.all(i32 0)
+  tail call void asm sideeffect "@$0 tcgen05.relinquish_alloc_permit.cta_group::1.sync.aligned;", "b"(i1 %19) #6
+  %21 = and i32 %18, 127
+  %22 = icmp eq i32 %21, 0
+  tail call void asm sideeffect "@$0 mbarrier.init.shared::cta.b64 [$1], 1;", "b,r"(i1 %22, ptr addrspace(3) getelementptr (i8, ptr addrspace(3) @global_smem, i32 8192)) #6
+  tail call void @llvm.nvvm.barrier.cta.sync.aligned.all(i32 0)
+  tail call void asm sideeffect "@$0 mbarrier.arrive.expect_tx.shared.b64 _, [$1], 8192;", "b,r"(i1 %22, ptr addrspace(3) getelementptr (i8, ptr addrspace(3) @global_smem, i32 8192)) #6
+  tail call void @llvm.nvvm.barrier.cta.sync.aligned.all(i32 0)
+  %23 = tail call { i32, i1 } @llvm.nvvm.elect.sync(i32 -1)
+  %24 = extractvalue { i32, i1 } %23, 1
+  %25 = icmp samesign ult i32 %21, 32
+  %26 = and i1 %25, %24
+  call void asm sideeffect "@$0 cp.async.bulk.tensor.2d.shared::cluster.global.mbarrier::complete_tx::bytes [$1], [$2, {$3, $4}], [$5];", "b,r,l,r,r,r"(i1 %26, ptr addrspace(3) @global_smem, ptr nonnull %0, i32 0, i32 0, ptr addrspace(3) getelementptr (i8, ptr addrspace(3) @global_smem, i32 8192)) #6
+  call void @llvm.nvvm.barrier.cta.sync.aligned.all(i32 0)
+  call void asm sideeffect "\0A{\0A\09.reg .pred complete;\0A\09waitLoop:\0A\09mbarrier.try_wait.parity.shared.b64 complete, [$0], $1;\0A\09@!complete bra.uni waitLoop;\0A}\0A", "r,r"(ptr addrspace(3) getelementptr (i8, ptr addrspace(3) @global_smem, i32 8192), i32 0) #6
+  call void @llvm.nvvm.barrier.cta.sync.aligned.all(i32 0)
+  call void asm sideeffect "@$0 mbarrier.inval.shared::cta.b64 [$1];", "b,r"(i1 %22, ptr addrspace(3) getelementptr (i8, ptr addrspace(3) @global_smem, i32 8192)) #6
+  call void asm sideeffect "@$0 mbarrier.init.shared::cta.b64 [$1], 1;", "b,r"(i1 %22, ptr addrspace(3) getelementptr (i8, ptr addrspace(3) @global_smem, i32 12288)) #6
+  call void @llvm.nvvm.barrier.cta.sync.aligned.all(i32 0)
+  call void asm sideeffect "@$0 mbarrier.arrive.expect_tx.shared.b64 _, [$1], 4096;", "b,r"(i1 %22, ptr addrspace(3) getelementptr (i8, ptr addrspace(3) @global_smem, i32 12288)) #6
+  call void asm sideeffect "fence.proxy.async.shared::cta;", ""() #6
+  call void @llvm.nvvm.barrier.cta.sync.aligned.all(i32 0)
+  %27 = call { i32, i1 } @llvm.nvvm.elect.sync(i32 -1)
+  %28 = extractvalue { i32, i1 } %27, 1
+  %29 = and i1 %25, %28
+  call void asm sideeffect "@$0 cp.async.bulk.tensor.2d.shared::cluster.global.mbarrier::complete_tx::bytes [$1], [$2, {$3, $4}], [$5];", "b,r,l,r,r,r"(i1 %29, ptr addrspace(3) getelementptr (i8, ptr addrspace(3) @global_smem, i32 8192), ptr nonnull %5, i32 0, i32 0, ptr addrspace(3) getelementptr (i8, ptr addrspace(3) @global_smem, i32 12288)) #6
+  call void @llvm.nvvm.barrier.cta.sync.aligned.all(i32 0)
+  call void asm sideeffect "\0A{\0A\09.reg .pred complete;\0A\09waitLoop:\0A\09mbarrier.try_wait.parity.shared.b64 complete, [$0], $1;\0A\09@!complete bra.uni waitLoop;\0A}\0A", "r,r"(ptr addrspace(3) getelementptr (i8, ptr addrspace(3) @global_smem, i32 12288), i32 0) #6
+  call void @llvm.nvvm.barrier.cta.sync.aligned.all(i32 0)
+  call void asm sideeffect "@$0 mbarrier.inval.shared::cta.b64 [$1];", "b,r"(i1 %22, ptr addrspace(3) getelementptr (i8, ptr addrspace(3) @global_smem, i32 12288)) #6
+  %30 = lshr i32 %18, 5
+  %31 = call i32 @llvm.nvvm.shfl.sync.idx.i32(i32 -1, i32 %30, i32 0, i32 31)
+  %32 = shl i32 %31, 21
+  %33 = and i32 %32, 6291456
+  %34 = add i32 %33, %20
+  call void asm sideeffect "@$0 tcgen05.st.sync.aligned.16x32bx2.x16.b32 [$1 + 0], 16, {$2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17};", "b,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r,r"(i1 true, i32 %34, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00) #6
+  call void @llvm.nvvm.tcgen05.wait.st()
+  call void @llvm.nvvm.barrier.cta.sync.aligned.all(i32 0)
+  call void @llvm.nvvm.barrier.cta.sync.aligned.all(i32 0)
+  call void asm sideeffect "@$0 mbarrier.init.shared::cta.b64 [$1], 1;", "b,r"(i1 %22, ptr addrspace(3) getelementptr (i8, ptr addrspace(3) @global_smem, i32 12288)) #6
+  %35 = icmp eq i32 %31, 0
+  br i1 %35, label %36, label %53
+
+36:                                               ; preds = %17
+  %37 = call { i32, i1 } @llvm.nvvm.elect.sync(i32 -1)
+  %38 = extractvalue { i32, i1 } %37, 1
+  %39 = lshr exact i32 ptrtoint (ptr addrspace(3) @global_smem to i32), 4
+  %40 = and i32 %39, 16383
+  %41 = zext nneg i32 %40 to i64
+  %42 = lshr exact i32 ptrtoint (ptr addrspace(3) getelementptr (i8, ptr addrspace(3) @global_smem, i32 8192) to i32), 4
+  %43 = and i32 %42, 16383
+  %44 = zext nneg i32 %43 to i64
+  %45 = or disjoint i64 %41, 4611756662049472512
+  %46 = or disjoint i64 %44, 4611756662049472512
+  call void asm sideeffect "@$5 tcgen05.mma.cta_group::1.kind::f16 [ $0 + 0 ], $1, $2, $3, $4;", "r,l,l,r,b,b"(i32 %20, i64 %45, i64 %46, i32 67633168, i1 true, i1 %38) #6
+  %47 = add nuw nsw i64 %41, 4611756662049472514
+  %48 = add nuw nsw i64 %44, 4611756662049472514
+  call void asm sideeffect "@$5 tcgen05.mma.cta_group::1.kind::f16 [ $0 + 0 ], $1, $2, $3, $4;", "r,l,l,r,b,b"(i32 %20, i64 %47, i64 %48, i32 67633168, i1 true, i1 %38) #6
+  %49 = add nuw nsw i64 %41, 4611756662049472516
+  %50 = add nuw nsw i64 %44, 4611756662049472516
+  call void asm sideeffect "@$5 tcgen05.mma.cta_group::1.kind::f16 [ $0 + 0 ], $1, $2, $3, $4;", "r,l,l,r,b,b"(i32 %20, i64 %49, i64 %50, i32 67633168, i1 true, i1 %38) #6
+  %51 = add nuw nsw i64 %41, 4611756662049472518
+  %52 = add nuw nsw i64 %44, 4611756662049472518
+  call void asm sideeffect "@$5 tcgen05.mma.cta_group::1.kind::f16 [ $0 + 0 ], $1, $2, $3, $4;", "r,l,l,r,b,b"(i32 %20, i64 %51, i64 %52, i32 67633168, i1 true, i1 %38) #6
+  call void asm sideeffect "@$0 tcgen05.commit.cta_group::1.mbarrier::arrive::one.b64 [$1];", "b,l"(i1 %38, ptr addrspace(3) getelementptr (i8, ptr addrspace(3) @global_smem, i32 12288)) #6
+  br label %53
+
+53:                                               ; preds = %36, %17
+  %54 = inttoptr i32 %20 to ptr addrspace(6)
+  call void @llvm.nvvm.barrier.cta.sync.aligned.all(i32 0)
+  call void asm sideeffect "\0A{\0A\09.reg .pred complete;\0A\09waitLoop:\0A\09mbarrier.try_wait.parity.shared.b64 complete, [$0], $1;\0A\09@!complete bra.uni waitLoop;\0A}\0A", "r,r"(ptr addrspace(3) getelementptr (i8, ptr addrspace(3) @global_smem, i32 12288), i32 0) #6
+  call void @llvm.nvvm.barrier.cta.sync.aligned.all(i32 0)
+  call void asm sideeffect "@$0 mbarrier.inval.shared::cta.b64 [$1];", "b,r"(i1 %22, ptr addrspace(3) getelementptr (i8, ptr addrspace(3) @global_smem, i32 12288)) #6
+  %55 = call { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 } asm sideeffect "tcgen05.ld.sync.aligned.16x32bx2.x16.b32 {$0, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15}, [$16 + 0], 16;", "=r,=r,=r,=r,=r,=r,=r,=r,=r,=r,=r,=r,=r,=r,=r,=r,r"(i32 %34) #6
+  %56 = extractvalue { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 } %55, 0
+  %57 = extractvalue { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 } %55, 1
+  %58 = extractvalue { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 } %55, 2
+  %59 = extractvalue { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 } %55, 3
+  %60 = extractvalue { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 } %55, 4
+  %61 = extractvalue { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 } %55, 5
+  %62 = extractvalue { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 } %55, 6
+  %63 = extractvalue { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 } %55, 7
+  %64 = extractvalue { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 } %55, 8
+  %65 = extractvalue { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 } %55, 9
+  %66 = extractvalue { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 } %55, 10
+  %67 = extractvalue { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 } %55, 11
+  %68 = extractvalue { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 } %55, 12
+  %69 = extractvalue { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 } %55, 13
+  %70 = extractvalue { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 } %55, 14
+  %71 = extractvalue { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32 } %55, 15
+  call void @llvm.nvvm.tcgen05.wait.ld()
+  %72 = shl nuw nsw i32 %18, 7
+  %73 = and i32 %72, 1920
+  %74 = shl nuw nsw i32 %18, 6
+  %75 = and i32 %74, 6144
+  %76 = shl nuw nsw i32 %18, 4
+  %77 = and i32 %76, 112
+  %78 = shl nuw nsw i32 %18, 2
+  %79 = and i32 %78, 64
+  %80 = or disjoint i32 %75, %77
+  %81 = xor i32 %80, %79
+  %82 = or disjoint i32 %81, %73
+  %83 = getelementptr inbounds nuw i8, ptr addrspace(3) @global_smem, i32 %82
+  %84 = insertelement <4 x i32> poison, i32 %56, i64 0
+  %85 = insertelement <4 x i32> %84, i32 %57, i64 1
+  %86 = insertelement <4 x i32> %85, i32 %58, i64 2
+  %87 = insertelement <4 x i32> %86, i32 %59, i64 3
+  store <4 x i32> %87, ptr addrspace(3) %83, align 16
+  %88 = xor i32 %82, 16
+  %89 = getelementptr inbounds nuw i8, ptr addrspace(3) @global_smem, i32 %88
+  %90 = insertelement <4 x i32> poison, i32 %60, i64 0
+  %91 = insertelement <4 x i32> %90, i32 %61, i64 1
+  %92 = insertelement <4 x i32> %91, i32 %62, i64 2
+  %93 = insertelement <4 x i32> %92, i32 %63, i64 3
+  store <4 x i32> %93, ptr addrspace(3) %89, align 16
+  %94 = xor i32 %82, 32
+  %95 = getelementptr inbounds nuw i8, ptr addrspace(3) @global_smem, i32 %94
+  %96 = insertelement <4 x i32> poison, i32 %64, i64 0
+  %97 = insertelement <4 x i32> %96, i32 %65, i64 1
+  %98 = insertelement <4 x i32> %97, i32 %66, i64 2
+  %99 = insertelement <4 x i32> %98, i32 %67, i64 3
+  store <4 x i32> %99, ptr addrspace(3) %95, align 16
+  %100 = xor i32 %82, 48
+  %101 = getelementptr inbounds nuw i8, ptr addrspace(3) @global_smem, i32 %100
+  %102 = insertelement <4 x i32> poison, i32 %68, i64 0
+  %103 = insertelement <4 x i32> %102, i32 %69, i64 1
+  %104 = insertelement <4 x i32> %103, i32 %70, i64 2
+  %105 = insertelement <4 x i32> %104, i32 %71, i64 3
+  store <4 x i32> %105, ptr addrspace(3) %101, align 16
+  call void asm sideeffect "fence.proxy.async.shared::cta;", ""() #6
+  call void @llvm.nvvm.barrier.cta.sync.aligned.all(i32 0)
+  %106 = call { i32, i1 } @llvm.nvvm.elect.sync(i32 -1)
+  %107 = extractvalue { i32, i1 } %106, 1
+  %108 = and i1 %25, %107
+  call void asm sideeffect "@$0 cp.async.bulk.tensor.2d.global.shared::cta.bulk_group [$1, {$2, $3}], [$4];", "b,l,r,r,r"(i1 %108, ptr nonnull %10, i32 0, i32 0, ptr addrspace(3) @global_smem) #6
+  call void @llvm.nvvm.cp.async.bulk.commit.group()
+  call void @llvm.nvvm.cp.async.bulk.wait.group.read(i32 0)
+  call void @llvm.nvvm.barrier.cta.sync.aligned.all(i32 0)
+  call void @llvm.nvvm.barrier.cta.sync.aligned.all(i32 0)
+  call void asm sideeffect "@$0 tcgen05.dealloc.cta_group::1.sync.aligned.b32 $1, 32;", "b,r"(i1 %19, ptr addrspace(6) %54) #6
+  ret void
+}
+
+; Function Attrs: mustprogress nocallback nofree nosync nounwind speculatable willreturn memory(none)
+declare noundef range(i32 0, 1024) i32 @llvm.nvvm.read.ptx.sreg.tid.x() #1
+
+; Function Attrs: convergent nocallback nounwind
+declare void @llvm.nvvm.barrier.cta.sync.aligned.all(i32) #2
+
+; Function Attrs: convergent mustprogress nocallback nofree nosync nounwind willreturn memory(inaccessiblemem: readwrite)
+declare { i32, i1 } @llvm.nvvm.elect.sync(i32) #3
+
+; Function Attrs: convergent nocallback nounwind memory(inaccessiblemem: readwrite)
+declare i32 @llvm.nvvm.shfl.sync.idx.i32(i32, i32, i32, i32) #4
+
+; Function Attrs: convergent nounwind memory(inaccessiblemem: readwrite)
+declare void @llvm.nvvm.tcgen05.wait.st() #5
+
+; Function Attrs: convergent nounwind memory(inaccessiblemem: readwrite)
+declare void @llvm.nvvm.tcgen05.wait.ld() #5
+
+; Function Attrs: nounwind
+declare void @llvm.nvvm.cp.async.bulk.commit.group() #6
+
+; Function Attrs: nounwind
+declare void @llvm.nvvm.cp.async.bulk.wait.group.read(i32 immarg) #6
+
+attributes #0 = { nounwind "nvvm.reqntid"="128" }
+attributes #1 = { mustprogress nocallback nofree nosync nounwind speculatable willreturn memory(none) }
+attributes #2 = { convergent nocallback nounwind }
+attributes #3 = { convergent mustprogress nocallback nofree nosync nounwind willreturn memory(inaccessiblemem: readwrite) }
+attributes #4 = { convergent nocallback nounwind memory(inaccessiblemem: readwrite) }
+attributes #5 = { convergent nounwind memory(inaccessiblemem: readwrite) }
+attributes #6 = { nounwind }
+
+!llvm.module.flags = !{!0, !1}
+!llvm.ident = !{!2}
+
+!0 = !{i32 2, !"Debug Info Version", i32 3}
+!1 = !{i32 4, !"nvvm-reflect-ftz", i32 1}
+!2 = !{!"clang version 3.8.0 (tags/RELEASE_380/final)"}
+
+
+// =================================================
+// PTX
+// =================================================
+//
+// Generated by LLVM NVPTX Back-End
+//
+
+.version 8.8
+.target sm_100a
+.address_size 64
+
+	// .globl	triton_dot              // -- Begin function triton_dot
+.extern .shared .align 16 .b8 global_smem[];
+                                        // @triton_dot
+.visible .entry triton_dot(
+	.param .align 64 .b8 triton_dot_param_0[128],
+	.param .u32 triton_dot_param_1,
+	.param .u32 triton_dot_param_2,
+	.param .u64 triton_dot_param_3,
+	.param .u64 triton_dot_param_4,
+	.param .align 64 .b8 triton_dot_param_5[128],
+	.param .u32 triton_dot_param_6,
+	.param .u32 triton_dot_param_7,
+	.param .u64 triton_dot_param_8,
+	.param .u64 triton_dot_param_9,
+	.param .align 64 .b8 triton_dot_param_10[128],
+	.param .u32 triton_dot_param_11,
+	.param .u32 triton_dot_param_12,
+	.param .u64 triton_dot_param_13,
+	.param .u64 triton_dot_param_14,
+	.param .u64 .ptr .global .align 1 triton_dot_param_15,
+	.param .u64 .ptr .global .align 1 triton_dot_param_16
+)
+.reqntid 128
+{
+	.reg .pred 	%p<13>;
+	.reg .b32 	%r<54>;
+	.reg .b64 	%rd<18>;
+
+// %bb.0:
+	mov.b64 	%rd3, triton_dot_param_0;
+	mov.b64 	%rd4, triton_dot_param_10;
+	cvta.param.u64 	%rd17, %rd4;
+	mov.b64 	%rd5, triton_dot_param_5;
+	cvta.param.u64 	%rd2, %rd5;
+	cvta.param.u64 	%rd1, %rd3;
+	mov.u32 	%r1, %tid.x;
+	setp.lt.u32 	%p1, %r1, 32;
+	mov.b32 	%r3, global_smem;
+	// begin inline asm
+	@%p1 tcgen05.alloc.cta_group::1.sync.aligned.shared::cta.b32 [%r3], 32;
+	// end inline asm
+	bar.sync 	0;
+	ld.shared.b32 	%r34, [global_smem];
+	bar.sync 	0;
+	// begin inline asm
+	@%p1 tcgen05.relinquish_alloc_permit.cta_group::1.sync.aligned;
+	// end inline asm
+	and.b32 	%r2, %r1, 127;
+	setp.eq.b32 	%p2, %r2, 0;
+	add.s32 	%r4, %r3, 8192;
+	// begin inline asm
+	@%p2 mbarrier.init.shared::cta.b64 [%r4], 1;
+	// end inline asm
+	bar.sync 	0;
+	// begin inline asm
+	@%p2 mbarrier.arrive.expect_tx.shared.b64 _, [%r4], 8192;
+	// end inline asm
+	bar.sync 	0;
+	elect.sync 	%r5|%p5, -1;
+	setp.lt.u32 	%p6, %r2, 32;
+	and.pred 	%p3, %p6, %p5;
+	mov.b32 	%r16, 0;
+	// begin inline asm
+	@%p3 cp.async.bulk.tensor.2d.shared::cluster.global.mbarrier::complete_tx::bytes [%r3], [%rd1, {%r16, %r16}], [%r4];
+	// end inline asm
+	bar.sync 	0;
+	// begin inline asm
+	
+{
+	.reg .pred complete;
+	waitLoop:
+	mbarrier.try_wait.parity.shared.b64 complete, [%r4], %r16;
+	@!complete bra.uni waitLoop;
+}
+
+	// end inline asm
+	bar.sync 	0;
+	// begin inline asm
+	@%p2 mbarrier.inval.shared::cta.b64 [%r4];
+	// end inline asm
+	add.s32 	%r15, %r3, 12288;
+	// begin inline asm
+	@%p2 mbarrier.init.shared::cta.b64 [%r15], 1;
+	// end inline asm
+	bar.sync 	0;
+	// begin inline asm
+	@%p2 mbarrier.arrive.expect_tx.shared.b64 _, [%r15], 4096;
+	// end inline asm
+	// begin inline asm
+	fence.proxy.async.shared::cta;
+	// end inline asm
+	bar.sync 	0;
+	elect.sync 	%r6|%p7, -1;
+	and.pred 	%p4, %p6, %p7;
+	// begin inline asm
+	@%p4 cp.async.bulk.tensor.2d.shared::cluster.global.mbarrier::complete_tx::bytes [%r4], [%rd2, {%r16, %r16}], [%r15];
+	// end inline asm
+	bar.sync 	0;
+	// begin inline asm
+	
+{
+	.reg .pred complete;
+	waitLoop:
+	mbarrier.try_wait.parity.shared.b64 complete, [%r15], %r16;
+	@!complete bra.uni waitLoop;
+}
+
+	// end inline asm
+	bar.sync 	0;
+	// begin inline asm
+	@%p2 mbarrier.inval.shared::cta.b64 [%r15];
+	// end inline asm
+	shr.u32 	%r7, %r1, 5;
+	shfl.sync.idx.b32 	%r8, %r7, 0, 31, -1;
+	shl.b32 	%r9, %r8, 21;
+	and.b32 	%r10, %r9, 6291456;
+	add.s32 	%r33, %r10, %r34;
+	mov.pred 	%p9, -1;
+	// begin inline asm
+	@%p9 tcgen05.st.sync.aligned.16x32bx2.x16.b32 [%r33 + 0], 16, {%r16, %r16, %r16, %r16, %r16, %r16, %r16, %r16, %r16, %r16, %r16, %r16, %r16, %r16, %r16, %r16};
+	// end inline asm
+	tcgen05.wait::st.sync.aligned;
+	bar.sync 	0;
+	bar.sync 	0;
+	// begin inline asm
+	@%p2 mbarrier.init.shared::cta.b64 [%r15], 1;
+	// end inline asm
+	setp.ne.b32 	%p8, %r8, 0;
+	@%p8 bra 	$L__BB0_2;
+// %bb.1:
+	elect.sync 	%r12|%p10, -1;
+	bfe.u32 	%r13, %r3, 4, 14;
+	cvt.u64.u32 	%rd15, %r13;
+	bfe.u32 	%r14, %r4, 4, 14;
+	cvt.u64.u32 	%rd16, %r14;
+	or.b64 	%rd6, %rd15, 4611756662049472512;
+	or.b64 	%rd7, %rd16, 4611756662049472512;
+	mov.b32 	%r11, 67633168;
+	// begin inline asm
+	@%p10 tcgen05.mma.cta_group::1.kind::f16 [ %r34 + 0 ], %rd6, %rd7, %r11, %p9;
+	// end inline asm
+	add.s64 	%rd8, %rd15, 4611756662049472514;
+	add.s64 	%rd9, %rd16, 4611756662049472514;
+	// begin inline asm
+	@%p10 tcgen05.mma.cta_group::1.kind::f16 [ %r34 + 0 ], %rd8, %rd9, %r11, %p9;
+	// end inline asm
+	add.s64 	%rd10, %rd15, 4611756662049472516;
+	add.s64 	%rd11, %rd16, 4611756662049472516;
+	// begin inline asm
+	@%p10 tcgen05.mma.cta_group::1.kind::f16 [ %r34 + 0 ], %rd10, %rd11, %r11, %p9;
+	// end inline asm
+	add.s64 	%rd12, %rd15, 4611756662049472518;
+	add.s64 	%rd13, %rd16, 4611756662049472518;
+	// begin inline asm
+	@%p10 tcgen05.mma.cta_group::1.kind::f16 [ %r34 + 0 ], %rd12, %rd13, %r11, %p9;
+	// end inline asm
+	cvt.u64.u32 	%rd14, %r15;
+	// begin inline asm
+	@%p10 tcgen05.commit.cta_group::1.mbarrier::arrive::one.b64 [%rd14];
+	// end inline asm
+$L__BB0_2:
+	bar.sync 	0;
+	// begin inline asm
+	
+{
+	.reg .pred complete;
+	waitLoop:
+	mbarrier.try_wait.parity.shared.b64 complete, [%r15], %r16;
+	@!complete bra.uni waitLoop;
+}
+
+	// end inline asm
+	bar.sync 	0;
+	// begin inline asm
+	@%p2 mbarrier.inval.shared::cta.b64 [%r15];
+	// end inline asm
+	// begin inline asm
+	tcgen05.ld.sync.aligned.16x32bx2.x16.b32 {%r17, %r18, %r19, %r20, %r21, %r22, %r23, %r24, %r25, %r26, %r27, %r28, %r29, %r30, %r31, %r32}, [%r33 + 0], 16;
+	// end inline asm
+	tcgen05.wait::ld.sync.aligned;
+	shl.b32 	%r35, %r1, 7;
+	and.b32 	%r36, %r35, 1920;
+	shl.b32 	%r37, %r1, 6;
+	and.b32 	%r38, %r37, 6144;
+	shl.b32 	%r39, %r1, 4;
+	and.b32 	%r40, %r39, 112;
+	shl.b32 	%r41, %r1, 2;
+	and.b32 	%r42, %r41, 64;
+	or.b32 	%r43, %r38, %r40;
+	xor.b32 	%r44, %r43, %r42;
+	or.b32 	%r45, %r44, %r36;
+	add.s32 	%r46, %r3, %r45;
+	st.shared.v4.b32 	[%r46], {%r17, %r18, %r19, %r20};
+	xor.b32 	%r47, %r45, 16;
+	add.s32 	%r48, %r3, %r47;
+	st.shared.v4.b32 	[%r48], {%r21, %r22, %r23, %r24};
+	xor.b32 	%r49, %r45, 32;
+	add.s32 	%r50, %r3, %r49;
+	st.shared.v4.b32 	[%r50], {%r25, %r26, %r27, %r28};
+	xor.b32 	%r51, %r45, 48;
+	add.s32 	%r52, %r3, %r51;
+	st.shared.v4.b32 	[%r52], {%r29, %r30, %r31, %r32};
+	// begin inline asm
+	fence.proxy.async.shared::cta;
+	// end inline asm
+	bar.sync 	0;
+	elect.sync 	%r53|%p12, -1;
+	and.pred 	%p11, %p6, %p12;
+	// begin inline asm
+	@%p11 cp.async.bulk.tensor.2d.global.shared::cta.bulk_group [%rd17, {%r16, %r16}], [%r3];
+	// end inline asm
+	cp.async.bulk.commit_group;
+	cp.async.bulk.wait_group.read 	0;
+	bar.sync 	0;
+	bar.sync 	0;
+	// begin inline asm
+	@%p1 tcgen05.dealloc.cta_group::1.sync.aligned.b32 %r34, 32;
+	// end inline asm
+	ret;
+                                        // -- End function
+}
+
