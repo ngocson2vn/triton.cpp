@@ -1,3 +1,40 @@
+<!-- TOC START -->
+- [Dialects](#dialects)
+  - [ttg - TritonGPU_Dialect](#ttg-tritongpu_dialect)
+  - [ttng - TritonNvidiaGPU_Dialect](#ttng-tritonnvidiagpu_dialect)
+  - [nvg - NVGPU_Dialect](#nvg-nvgpu_dialect)
+  - [ttng vs nvg](#ttng-vs-nvg)
+    - [1. Different Levels of Abstraction](#1-different-levels-of-abstraction)
+    - [2. The Progressive Lowering Pipeline](#2-the-progressive-lowering-pipeline)
+      - [The Nightmare: Variable Register Counts for `wgmma`](#the-nightmare-variable-register-counts-for-wgmma)
+      - [The Solution: `nvg` as the "PTX Generation Engine"](#the-solution-nvg-as-the-ptx-generation-engine)
+      - [Why this is a Massive Practical Benefit](#why-this-is-a-massive-practical-benefit)
+    - [Why not just bake those exact same PTX abstractions directly into `ttng`?](#why-not-just-bake-those-exact-same-ptx-abstractions-directly-into-ttng)
+      - [1. The Semantic Gap: Tensors vs. Registers](#1-the-semantic-gap-tensors-vs-registers)
+      - [2. High-Level Optimizations Need to Happen *Before* Shattering](#2-high-level-optimizations-need-to-happen-before-shattering)
+      - [3. Avoiding Compiler Code Bloat (Separation of Concerns)](#3-avoiding-compiler-code-bloat-separation-of-concerns)
+    - [3. Why a custom `nvg` instead of upstream MLIR's `nvgpu`?](#3-why-a-custom-nvg-instead-of-upstream-mlirs-nvgpu)
+- [Conversion vs Transforms](#conversion-vs-transforms)
+    - [1. `Conversion` (Inter-dialect Translation)](#1-conversion-inter-dialect-translation)
+    - [2. `Transforms` (Intra-dialect Optimization)](#2-transforms-intra-dialect-optimization)
+    - [Summary](#summary)
+- [The `ConvertTritonGPUToLLVM` pass](#the-converttritongputollvm-pass)
+    - [1. Composition over Duplication](#1-composition-over-duplication)
+    - [2. MLIR’s Pattern-Based Framework](#2-mlirs-pattern-based-framework)
+    - [3. True Separation of Concerns](#3-true-separation-of-concerns)
+    - [Summary](#summary)
+  - [Why don't Triton team separate concerns like this?](#why-dont-triton-team-separate-concerns-like-this)
+    - [1. The "Type Conversion" Problem](#1-the-type-conversion-problem)
+    - [2. Operations Don't Exist in a Vacuum](#2-operations-dont-exist-in-a-vacuum)
+    - [3. Modularity at the "Pattern" Level, Not the "Pass" Level](#3-modularity-at-the-pattern-level-not-the-pass-level)
+    - [Summary](#summary)
+  - [Hardware-Agnostic and NVIDIA-Specific patterns](#hardware-agnostic-and-nvidia-specific-patterns)
+    - [1. The Single "Bucket" Approach](#1-the-single-bucket-approach)
+    - [2. Simultaneous, Worklist-Driven Application](#2-simultaneous-worklist-driven-application)
+    - [3. The Magic of the `TypeConverter`](#3-the-magic-of-the-typeconverter)
+    - [Why Two Passes Fail but One Pass Succeeds](#why-two-passes-fail-but-one-pass-succeeds)
+<!-- TOC END -->
+
 # Dialects
 ## ttg - TritonGPU_Dialect
 ```C++
@@ -141,27 +178,29 @@ You might wonder why Triton maintains its own `nvg` dialect in `third_party/nvid
 The primary reason is **development velocity**. Triton is designed to extract maximum performance from cutting-edge NVIDIA architectures (like Hopper and Blackwell). Features such as Tensor Memory Accelerator (TMA) instructions, specialized cache eviction modifiers, and advanced thread-block synchronization primitives are needed in Triton immediately upon hardware release. Upstream MLIR moves much slower and requires rigorous standardization. By maintaining its own `nvg` dialect, Triton engineers can rapidly model new PTX instructions and quickly iterate without waiting months for upstream MLIR merges.
 
 
-# Conversion vs Transforms
-In the Triton compiler (which is built on top of the MLIR framework), the absolute difference between the **`Conversion`** and **`Transforms`** directories stems from standard MLIR compiler design principles:
+# Transforms vs Conversion
+In the Triton compiler (which is built on top of the MLIR framework), the absolute difference between the **`Transforms`** and **`Conversion`** directories stems from standard MLIR compiler design principles:
 
-### 1. `Conversion` (Inter-dialect Translation)
-
-The `Conversion` directory is responsible for **lowering** or translating code from one dialect (abstraction level) to another.
-
-* **What it does:** It takes operations defined in one dialect and converts them into operations of a lower-level or different dialect. This often involves changing the types of the variables and the fundamental semantics of the program.
-* **Example (`lib/Conversion/`):** Inside this directory, you will find passes like `TritonToTritonGPU` (which converts hardware-agnostic Triton IR into GPU-specific Triton IR) and `TritonGPUToLLVM` (which translates TritonGPU IR down into the LLVM IR dialect so it can eventually be compiled to machine code like PTX).
-
-### 2. `Transforms` (Intra-dialect Optimization)
+### 1. `Transforms` (Intra-dialect Optimization)
 
 The `Transforms` directories are responsible for **optimizing** or restructuring code *within the same dialect*.
 
 * **What it does:** It takes an existing IR, analyzes it, and mutates it to make it run faster or use memory more efficiently, without fundamentally changing the dialect or the abstraction level.
 * **Example (`lib/Dialect/TritonNvidiaGPU/Transforms`):** Inside this directory, you will find passes that are strictly scoped to the `TritonNvidiaGPU` dialect. Examples include memory coalescing, software pipelining, inserting async memory fences (like `cp.async.commit_group`), or optimizing Tensor Memory Accelerator (TMA) usage. The input is `TritonNvidiaGPU` IR, and the output is just a more highly-optimized version of `TritonNvidiaGPU` IR.
 
+### 2. `Conversion` (Inter-dialect Translation)
+
+The `Conversion` directory is responsible for **lowering** or translating code from one dialect (abstraction level) to another.
+
+* **What it does:** It takes operations defined in one dialect and converts them into operations of a lower-level or different dialect. This often involves changing the types of the variables and the fundamental semantics of the program.
+* **Example (`lib/Conversion/`):** Inside this directory, you will find passes like `TritonToTritonGPU` (which converts hardware-agnostic Triton IR into GPU-specific Triton IR) and `TritonGPUToLLVM` (which translates TritonGPU IR down into the LLVM IR dialect so it can eventually be compiled to machine code like PTX).
+
 ### Summary
 
 * **`Transforms`** = **Optimization** (Same dialect in $\rightarrow$ Optimized same dialect out).
 * **`Conversion`** = **Lowering/Translation** (Higher-level dialect in $\rightarrow$ Lower-level dialect out).
+<br/><br/>
+
 
 # The `ConvertTritonGPUToLLVM` pass
 I found that the pass `ConvertTritonGPUToLLVM` which is a third-party pass in https://github.com/triton-lang/triton/blob/main/third_party/nvidia/lib/TritonNVIDIAGPUToLLVM/TritonGPUToLLVM.cpp#L78 applies multiple patterns from the Conversion's sub-directory https://github.com/triton-lang/triton/tree/main/lib/Conversion/TritonGPUToLLVM. I feel that this is a not modular design because the third-party code is tightly-coupled with the Triton's core code. For a sane, modular design, I think the third-party code should be responsible for itself only.
