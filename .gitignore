@@ -6,3 +6,4 @@ refs/
 .cmake.sha256
 output.*
 .vscode/vc.*
+lowering.mlir

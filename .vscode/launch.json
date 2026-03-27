@@ -29,6 +29,20 @@
             "64"
         ],
         "env": {}
+    },
+    {
+        "name": "compile_triton_dot",
+        "type": "lldb-dap",
+        "request": "launch",
+        "initCommands": [
+            "command script import ${workspaceFolder}/llvm-project/llvm/utils/lldbDataFormatters.py"
+        ],
+        "program": "${workspaceFolder}/build/bin/triton_compiler",
+        "cwd": "${workspaceFolder}/",
+        "args": [
+            "${workspaceFolder}/triton_dot.ttir",
+        ],
+        "env": {}
     }
   ]
 }
