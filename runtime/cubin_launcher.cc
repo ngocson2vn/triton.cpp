@@ -56,8 +56,11 @@ class CudaInitializer {
     CUDA_CHECK_RET_NULL(cuDeviceGet(&device, 0));
 
     CUcontext context;
+#if (CUDA_VERSION < 13000)
     CUDA_CHECK_RET_NULL(cuCtxCreate(&context, 0, device));
-
+#else
+    CUDA_CHECK_RET_NULL(cuCtxCreate(&context, nullptr, 0, device));
+#endif
     return context;
   }
 

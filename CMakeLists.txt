@@ -64,7 +64,7 @@ endfunction()
 
 
 # Disable warnings that show up in external code (gtest;pybind11)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wno-covered-switch-default -fvisibility=hidden -fno-rtti -g -O0")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated -Werror -Wno-covered-switch-default -fvisibility=hidden -fno-rtti -g -O0")
 
 include_directories(".")
 include_directories(${MLIR_INCLUDE_DIRS})
@@ -102,5 +102,6 @@ add_subdirectory(third_party/f2reduce)
 
 set(CUDA_HOME $ENV{CUDA_HOME})
 include_directories(${CUDA_HOME}/include)
+include_directories(${CUDA_HOME}/include/cccl)
 add_subdirectory(runtime)
 add_subdirectory(bin)
