@@ -51,6 +51,38 @@ target_link_libraries(triton_compiler PRIVATE
 
 mlir_check_all_link_libraries(triton_compiler)
 
+# triton_test
+add_llvm_executable(triton_test triton_test.cpp PARTIAL_SOURCES_INTENDED)
+target_compile_options(triton_test PRIVATE -fno-rtti -g -O0)
+llvm_update_compile_flags(triton_test)
+target_link_libraries(triton_test PRIVATE
+  ${dialect_libs}
+  ${conversion_libs}
+  ${triton_libs}
+
+  # MLIR core
+  MLIROptLib
+  MLIRPass
+  MLIRRegisterAllPasses
+  MLIRTransforms
+  MLIRLLVMToLLVMIRTranslation
+
+  # LLVM
+  LLVMTarget
+  LLVMX86CodeGen
+  LLVMX86AsmParser
+  LLVMX86Disassembler
+  LLVMX86TargetMCA
+  LLVMX86Desc
+  LLVMX86Info
+
+  # CUDA
+  ${CUDA_RUNTIME}
+  ${CUDA_DRIVER}
+)
+
+mlir_check_all_link_libraries(triton_test)
+
 add_executable(run_add_kernel run_add_kernel.cpp)
 target_compile_options(run_add_kernel PRIVATE -fno-rtti -g -O0)
 target_link_libraries(run_add_kernel PRIVATE

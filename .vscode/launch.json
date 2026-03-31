@@ -5,6 +5,18 @@
   "version": "0.2.0",
   "configurations": [
     {
+        "name": "triton_test",
+        "type": "lldb-dap",
+        "request": "launch",
+        "initCommands": [
+            "command script import ${workspaceFolder}/llvm-project/llvm/utils/lldbDataFormatters.py"
+        ],
+        "program": "${workspaceFolder}/build/bin/triton_test",
+        "cwd": "${workspaceFolder}/",
+        "args": [],
+        "env": {}
+    },
+    {
         "name": "triton_compiler",
         "type": "lldb-dap",
         "request": "launch",
