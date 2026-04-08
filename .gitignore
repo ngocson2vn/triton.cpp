@@ -2,7 +2,6 @@ build/
 llvm-project/
 __pycache__/
 tmp/
-refs/
 .cmake.sha256
 output.*
 .vscode/vc.*
