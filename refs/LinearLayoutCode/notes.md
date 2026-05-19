@@ -424,3 +424,13 @@ By correctly applying an `offset` of 0 (because the physical inputs don't overla
   * Row 2: `[8, 0]` *(Controls $j_3$)*
   * Row 3: `[0, 2]` *(Controls $i_1$)*
   * Row 4: `[0, 4]` *(Controls $i_2$)*
+<br/>
+
+# The `bases` data member in `LinearLayout` class
+```C++
+  llvm::MapVector<StringAttr /*inDim*/,
+                  std::vector<std::vector<int32_t> /*size=getNumOutDims()*/>
+                  /*size=getInDimSizeLog2(inDim)*/>
+      bases;
+```
+`bases` stores columns $C_0,\, C_1,\, \cdot, C_n$ of matrix $A$. When $A$ is an identity matrix, $C_i$ are basis vectors in the input space.

@@ -83,3 +83,78 @@ The matrix $A$ satisfies the equation $w = A v$. Its job is to route the physica
 
 The layout is heavily dependent on powers of two, meaning each component (Reg, Thr, Wrp) controls specific bits of the logical $x$ (col $j$) and $y$ (row $i$) coordinates.
 
+## Core Idea
+A LinearLayout maps $n$ bits of linear indices of a hardware component (such as Register, Thread, Warp) to $n_i$ bits of dimension $i$-th, where, $\sum\limits_{i=0}^{l}n_i = n$, $l$ is the number of dimensions. For example, considering the following layout:
+
+<img src="./layoutA.png" width="30%">
+
+Linear indices of Registers are: 0, 1, 2, 3. So a Register indices can be represented by 2 bits. <br/>
+We can map 
+- the 1st bit $R_0$ to the 1st bit of $j$ dimension: $j = R_0$
+- the 2nd bit $R_1$ to the 1st bit of $i$ dimension: $i = R_1$
+
+
+Linear indices of Threads in a Warp are: 0, 1, 2, ..., 31, which can be represented by 5 bits. <br/>
+We can map 
+- the first 3 bits $T_0,\; T_1,\; T_2$ to the next 3 bits slot of $j$ dimension (after the Register bit $R_0$): $j = T_2 T_1 T_0 R_0$
+- the next 2 bits to the next 2 bits slot of $i$ dimension (after the Register bit $R_1$): $i = T_4 T_3 R_1$
+
+Linear indices of Warps are: 0, 1 which can be represented by 1 bit. <br/>
+We can map
+- the only bit $W_0$ to the next bit slot of $i$ dimension: $ i = W_0 T_4 T_3 R_1$
+
+Finally, we can express the above mappings as a Linear Layout as follows: <br/>
+$v = (R_0, R_1, T_0, T_1, T_2, T_3, T_4, W_0) \rightarrow w = (R_0, T_0, T_1, T_2, R_1, T_3, T_4, W_0)$ <br/>
+Then, we can extract $j$ and $i$ as follows:
+- $j = (w[0] \ll 0) \oplus (w[1] \ll 1) \oplus (w[2] \ll 2) \oplus (w[3] \ll 3)$
+- $i = (w[4] \ll 0) \oplus (w[5] \ll 1) \oplus (w[6] \ll 2) \oplus (w[7] \ll 3)$
+<br/>
+
+## Basis Vectors
+In linear algebra, any matrix $A$ representing a linear transformation is entirely defined by what it does to the standard basis vectors of the input space.
+
+Here is the formal proof of that claim. It is one of the most elegant and foundational proofs in linear algebra, and it relies entirely on the two defining properties of a linear transformation: **additivity** and **scalar multiplication**.
+
+### The Setup
+
+Let $V$ and $W$ be vector spaces over a field (like our binary field $\mathbb{F}_2$ or the real numbers).
+
+Let $T$ be a linear transformation from $V$ to $W$ ($T: V \to W$).
+
+By definition, a transformation is "linear" if and only if it satisfies two conditions for any vectors $u, v \in V$ and any scalar $c$:
+
+1. **Additivity:** $T(u + v) = T(u) + T(v)$
+2. **Scalar Multiplication:** $T(cv) = cT(v)$
+
+Now, let $e_1, e_2, \dots, e_n$ be the standard basis vectors for the input space $V$. By the definition of a basis, *any* arbitrary vector $v \in V$ can be written uniquely as a linear combination of these basis vectors:
+
+$$v = c_1e_1 + c_2e_2 + \dots + c_ne_n$$
+
+where $c_1, c_2, \dots, c_n$ are scalar coefficients (in the case of $\mathbb{F}_2$, these scalars are simply bits, 0 or 1).
+
+### The Proof
+
+We want to find out what the transformation $T$ does to our arbitrary vector $v$. We start by applying $T$ to both sides of our equation:
+
+$$T(v) = T(c_1e_1 + c_2e_2 + \dots + c_ne_n)$$
+
+First, we apply the **additivity** property of linear transformations. We can split the single transformation of a sum into a sum of individual transformations:
+
+$$T(v) = T(c_1e_1) + T(c_2e_2) + \dots + T(c_ne_n)$$
+
+Next, we apply the **scalar multiplication** property. We can pull the scalar coefficients out to the front of each transformation:
+
+$$T(v) = c_1T(e_1) + c_2T(e_2) + \dots + c_nT(e_n)$$
+
+### The Conclusion
+
+Look closely at the final equation. To calculate $T(v)$ for *any* arbitrary vector $v$, the only pieces of information you need are:
+
+1. The scalars $c_1, c_2, \dots, c_n$ (which are just the coordinates of the input vector $v$).
+2. The vectors $T(e_1), T(e_2), \dots, T(e_n)$.
+
+The vectors $T(e_1), \dots, T(e_n)$ are exactly the **mapped outputs of the standard basis vectors**.
+
+Because $v$ was chosen to be any arbitrary vector in the entire space, this equation proves that if you know what the transformation does to the basis vectors, you possess all the information needed to calculate what it does to literally every other vector in existence within that space.
+
+When you organize this linear transformation into a matrix $A$, you simply place $T(e_1)$ as the first column, $T(e_2)$ as the second column, and so on. This is why storing the transformed basis vectors—as Triton's C++ code does—is mathematically identical to storing the full transformation matrix $A$.

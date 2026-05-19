@@ -92,3 +92,127 @@ module attributes {"ttg.num-ctas" = 1 : i32, "ttg.num-warps" = 4 : i32, ttg.targ
   }
 }
 ```
+
+## 3. Lowering ttng.async_tma_copy_global_to_local
+third_party/nvidia/lib/TritonNVIDIAGPUToLLVM/LoadStoreOpToLLVM.cpp:1310
+```MLIR
+"ttng.async_tma_copy_global_to_local"(%2, %27, %27, %44, %36, %25) <{cache = 1 : i32, evict = 1 : i32, isVolatile = false}> : (!tt.tensordesc<tensor<64x64xf16, #ttg.nvmma_shared<{swizzlingByteWidth = 128, transposed = false, elementBitWidth = 16}>>>, i32, i32, !ttg.memdesc<1xi64, #ttg.swizzled_shared<{vec = 1, perPhase = 1, maxPhase = 1, order = [0]}>, #ttg.shared_memory, mutable>, !ttg.memdesc<64x64xf16, #ttg.nvmma_shared<{swizzlingByteWidth = 128, transposed = false, elementBitWidth = 16}>, #ttg.shared_memory, mutable>, i1) -> ()
+```
+
+```C++
+auto smemTy = op.getResult().getType();
+// smemTy: !ttg.memdesc<64x64xf16, #ttg.nvmma_shared<{swizzlingByteWidth = 128, transposed = false, elementBitWidth = 16}>, #ttg.shared_memory, mutable>
+
+auto msgToPackedOffset = getMsgToPackedOffsetLayout(smemTy);
+```
+
+Debug:
+```
+--- operator*(LinearLayout inner, LinearLayout outer) ---
+inner: 
+(empty layout)
+
+outer: 
+ - msg is a size 1 dimension
+where out dims are: [dim0 (size 64)]
+
+inDims:
+  - "msg"
+outDims:
+  - "dim0"
+
+inDimSizesLog2:
+  - "msg": 0
+outDimSizesLog2:
+  - "dim0": 6
+
+result: 
+ - msg is a size 1 dimension
+where out dims are: [dim0 (size 64)]
+---------------------------------------------------------
+
+--- operator*(LinearLayout inner, LinearLayout outer) ---
+inner: 
+ - msg is a size 1 dimension
+where out dims are: [dim0 (size 64)]
+
+outer: 
+ - msg is a size 1 dimension
+where out dims are: [dim1 (size 64)]
+
+inDims:
+  - "msg"
+outDims:
+  - "dim0"
+  - "dim1"
+
+inDimSizesLog2:
+  - "msg": 0
+outDimSizesLog2:
+  - "dim0": 6
+  - "dim1": 6
+
+result: 
+ - msg is a size 1 dimension
+where out dims are: [dim0 (size 64), dim1 (size 64)]
+---------------------------------------------------------
+
+--- operator*(LinearLayout inner, LinearLayout outer) ---
+inner: 
+ - msg is a size 1 dimension
+where out dims are: [dim0 (size 64), dim1 (size 64)]
+
+outer: 
+ - block is a size 1 dimension
+where out dims are: [dim0 (size 1)]
+
+inDims:
+  - "msg"
+  - "block"
+outDims:
+  - "dim0"
+  - "dim1"
+
+inDimSizesLog2:
+  - "msg": 0
+  - "block": 0
+outDimSizesLog2:
+  - "dim0": 6
+  - "dim1": 6
+
+result: 
+ - msg is a size 1 dimension
+ - block is a size 1 dimension
+where out dims are: [dim0 (size 64), dim1 (size 64)]
+---------------------------------------------------------
+
+--- operator*(LinearLayout inner, LinearLayout outer) ---
+inner: 
+ - msg is a size 1 dimension
+ - block is a size 1 dimension
+where out dims are: [dim0 (size 64), dim1 (size 64)]
+
+outer: 
+ - block is a size 1 dimension
+where out dims are: [dim1 (size 1)]
+
+inDims:
+  - "msg"
+  - "block"
+outDims:
+  - "dim0"
+  - "dim1"
+
+inDimSizesLog2:
+  - "msg": 0
+  - "block": 0
+outDimSizesLog2:
+  - "dim0": 6
+  - "dim1": 6
+
+result: 
+ - msg is a size 1 dimension
+ - block is a size 1 dimension
+where out dims are: [dim0 (size 64), dim1 (size 64)]
+---------------------------------------------------------
+```

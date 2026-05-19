@@ -31,96 +31,95 @@ namespace tt = mlir::triton;
 namespace ttg = mlir::triton::gpu;
 namespace ttng = mlir::triton::nvidia_gpu;
 
+template <typename T>
+llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const SmallVector<T>& vec) {
+  if (vec.empty()) {
+    os << "[]";
+    return os;
+  }
+
+  os << "[" << vec[0];
+  for (int i = 1; i < vec.size(); i++) {
+    os << ", " << vec[i];
+  }
+  os << "]";
+
+  return os;
+}
+
 static LinearLayout getMsgToPackedOffsetLayout(ttg::MemDescType ty) {
+  llvm::outs() << "--- getMsgToPackedOffsetLayout ---\n";
   auto ctx = ty.getContext();
   auto kMsg = str_attr("msg");
   auto kBlock = str_attr("block");
   auto shapePerCTA = ttg::getShapePerCTA(ty);
+  llvm::outs() << "shapePerCTA: " << shapePerCTA << "\n";
+  // shapePerCTA: [64, 64]
+
   int rank = shapePerCTA.size();
   auto blockShape = ttng::getTMABlockShape(ty, /*packedSize=*/true);
+  llvm::outs() << "blockShape: " << blockShape << "\n\n";
+  // blockShape: [64, 64]
+
   auto outDimNames = standardOutDimNames(ctx, rank);
   LinearLayout msgToOffset;
   for (int dim = 0; dim < rank; ++dim) {
-    msgToOffset *=
-        LinearLayout::strided1D(shapePerCTA[dim] / blockShape[dim],
-                                blockShape[dim], kMsg, outDimNames[dim]);
+    // Map a TMA message ID to an offset per dimension. For example,
+    // shapePerCTA = [128, 128]
+    // blockShape = [64, 64]
+    // => The number of TMA messages = 2*2 = 4 (i.e. "msg" has 2 bits)
+    // 
+    // For dim = 0
+    // msg = 0 -> dim0 = 0 * 64 = 0
+    // msg = 1 -> dim0 = 1 * 64 = 64
+    // 
+    // For dim = 1
+    // msg = 0 -> dim1 = 0 * 64 = 0
+    // msg = 1 -> dim1 = 1 * 64 = 64
+    auto layout = LinearLayout::strided1D(shapePerCTA[dim] / blockShape[dim],
+                                          blockShape[dim], kMsg, outDimNames[dim]);
+    llvm::outs() << "dim = " << dim << ", layout:";
+    llvm::outs() << layout << "\n\n";
+    msgToOffset *= layout;
   }
+  llvm::outs() << "msgToOffset: " << msgToOffset << "\n\n";
+
   auto ctaLayout = ttg::getCTALayout(ty.getEncoding());
+  auto CTAOrder = ctaLayout.getCTAOrder();
+  llvm::outs() << "CTAOrder: " << CTAOrder << "\n";
+  auto CTASplitNum = ctaLayout.getCTASplitNum();
+  llvm::outs() << "CTASplitNum: " << CTASplitNum << "\n\n";
+
   for (int i = 0; i < rank; ++i) {
-    auto dim = ctaLayout.getCTAOrder()[i];
-    msgToOffset *= LinearLayout::identity1D(ctaLayout.getCTASplitNum()[dim],
-                                            kBlock, outDimNames[dim]);
+    auto dim = CTAOrder[i];
+    auto layout = LinearLayout::identity1D(CTASplitNum[dim], kBlock, outDimNames[dim]);
+    llvm::outs() << "dim = " << dim << ", layout:";
+    llvm::outs() << layout << "\n\n";
+    msgToOffset *= layout;
   }
+
+  llvm::outs() << "----------------------------------\n\n";
+
   return msgToOffset;
 }
 
-LinearLayout buildLayoutA(MLIRContext* ctx) {
-  // For Layout A from the paper (16x16 tensor):
-  // - Logical dimensions: "dim0" (i), "dim1" (j)
-  // - Physical dimensions: "register", "thread", "warp"
-
-  // 1. Registers (2x2 registers)
-  // Bit 0 of register points to bit 0 of dim1 (j)
-  // Bit 1 of register points to bit 0 of dim0 (i)
-  auto reg = StringAttr::get(ctx, "register");
-  auto thread = StringAttr::get(ctx, "thread");
-  auto warp = StringAttr::get(ctx, "warp");
-  auto dim1 = StringAttr::get(ctx, "dim1");
-  auto dim0 = StringAttr::get(ctx, "dim0");
-  LinearLayout regLayout = LinearLayout::identity1D(2, reg, dim1) * LinearLayout::identity1D(2, reg, dim0);
-
-  // 2. Threads (4x8 threads)
-  // Bits 0..2 of thread point to bits 1..3 of dim1 (j)
-  // Bits 3..4 of thread point to bits 1..2 of dim0 (i)
-  LinearLayout threadLayout = LinearLayout::identity1D(8, thread, dim1) * LinearLayout::identity1D(4, thread, dim0);
-
-  // 3. Warps (2x1 warps)
-  // Bit 0 of warp points to bit 3 of dim0 (i)
-  LinearLayout warpLayout = LinearLayout::identity1D(2, warp, dim0);
-
-  // 4. Combine them using the Product operation (operator*)
-  // Multiplying layouts automatically stacks and concatenates their output bases.
-  // For dim1: 1 bit (Reg) + 3 bits (Thread) = 4 bits (size 16)
-  // For dim0: 1 bit (Reg) + 2 bits (Thread) + 1 bit (Warp) = 4 bits (size 16)
-  LinearLayout layoutA = regLayout * threadLayout * warpLayout;
-
-  return layoutA;
+static LinearLayout
+getMsgToUnpackedOffsetLayout(const LinearLayout &packedLayout,
+                             ttg::MemDescType ty) {
+  auto isFp4Padded =
+      cast<ttg::NVMMASharedEncodingAttr>(ty.getEncoding()).getFp4Padded();
+  if (!isFp4Padded) {
+    return packedLayout;
+  }
+  auto ctx = ty.getContext();
+  auto rank = ty.getRank();
+  auto kMsg = str_attr("msg");
+  auto kLastDim = str_attr("dim" + Twine(rank - 1));
+  // Multiply to offset by 2 in the last dimension
+  auto unpackLayout = LinearLayout::zeros1D(1, kMsg, kLastDim, 2);
+  return unpackLayout * packedLayout;
 }
 
-// A helper function to simulate the F2 matrix-vector multiplication
-std::pair<int, int> applyLayout(MLIRContext* ctx, LinearLayout& layout, int v) {
-  int v_reg    = v & 0b00000011;
-  int v_thread = (v & 0b01111100) >> 2;
-  int v_warp   = (v & 0b10000000) >> 7;
-  int w_dim1 = 0; // This will hold our column (j)
-  int w_dim0 = 0; // This will hold our row (i)
-
-  auto reg = StringAttr::get(ctx, "register");
-  auto thread = StringAttr::get(ctx, "thread");
-  auto warp = StringAttr::get(ctx, "warp");
-  auto dim1 = StringAttr::get(ctx, "dim1");
-  auto dim0 = StringAttr::get(ctx, "dim0");
-
-  // 1. Process Register bits
-  for (int bit = 0; bit < layout.getInDimSizeLog2(reg); ++bit) {
-    if ((v_reg >> bit) & 1) { // If this physical bit is ON
-      w_dim1 ^= layout.getBasis(reg, bit, dim1);
-      w_dim0 ^= layout.getBasis(reg, bit, dim0);
-    }
-  }
-
-  // 2. Process Thread bits
-  for (int bit = 0; bit < layout.getInDimSizeLog2(thread); ++bit) {
-    if ((v_thread >> bit) & 1) { // If this physical bit is ON
-      w_dim1 ^= layout.getBasis(thread, bit, dim1);
-      w_dim0 ^= layout.getBasis(thread, bit, dim0);
-    }
-  }
-
-  w_dim0 ^= layout.getBasis(warp, 0, dim0);
-
-  return {w_dim0, w_dim1}; // Return (i, j)
-}
 
 int main(int argc, char** argv) {
   mlir::DialectRegistry registry;
@@ -137,99 +136,92 @@ int main(int argc, char** argv) {
   context.loadDialect<arith::ArithDialect>();
   context.loadDialect<func::FuncDialect>();
 
-
-  llvm::outs() << "========================================================================================\n";
-  llvm::outs() << "LinearLayout\n";
-  llvm::outs() << "========================================================================================\n";
-  // 1. Define the names of your input (hardware) and output (logical) dimensions
-  auto inRowDim = StringAttr::get(ctx, "in_row");
-  auto inColDim = StringAttr::get(ctx, "in_col");
-  auto outRowDim = StringAttr::get(ctx, "out_row");
-  auto outColDim = StringAttr::get(ctx, "out_col");
-
-  // 2. Create a 1D layout for the 16 rows.
-  // We use `strided1D` with size=16 and stride=1, meaning each step in `in_row` 
-  // moves 1 step in `out_row`.
-  LinearLayout rowLayout = LinearLayout::strided1D(
-      /*size=*/16, 
-      /*stride=*/1, 
-      /*inDimName=*/inRowDim, 
-      /*outDimName=*/outRowDim
-  );
-
-  // 3. Create a 1D layout for the 16 columns.
-  // size=16, stride=1
-  LinearLayout colLayout = LinearLayout::strided1D(
-      /*size=*/16, 
-      /*stride=*/1, 
-      /*inDimName=*/inColDim, 
-      /*outDimName=*/outColDim
-  );
-
-  // 4. Multiply them to compute the Direct Sum!
-  // This results in a 2D LinearLayout mapping:
-  // (in_row=16, in_col=16) -> (out_row=16, out_col=16)
-  LinearLayout layout16x16 = rowLayout * colLayout;
-  llvm::outs() << "\nlayout16x16: " << layout16x16 << "\n\n";
-
-  auto layoutA = buildLayoutA(ctx);
-  llvm::outs() << "layoutA: " << layoutA << "\n\n";
-
-  int v = 0b11010101;
-  auto w = applyLayout(ctx, layoutA, v);
-  llvm::outs() << "v = " << v << "\n";
-  llvm::outs() << "i = " << w.first << "\n";
-  llvm::outs() << "j = " << w.second << "\n";
-
-  llvm::outs() << "========================================================================================\n\n";
-
-
-  //==========================================================================================================
-  // MemDescType
-  //==========================================================================================================
   // Create a ModuleOp
   OpBuilder builder(ctx);
   auto loc = UnknownLoc::get(ctx);
   ModuleOp mod = builder.create<ModuleOp>(loc);
   builder.setInsertionPointToStart(mod.getBody());
 
+  // 
   // Create a RankedTensorType instance
-  llvm::SmallVector<int64_t, 2> shape{64, 64};
+  // 
+
+  // =======================
+  // 1. Tensor shape
+  // =======================
+  llvm::SmallVector<int64_t, 2> shape{128, 128};
+
+  // =======================
+  // 2. Element type
+  // =======================
   mlir::Type elementType = builder.getF16Type();
 
-  // Create the specific encoding attribute
-  llvm::SmallVector<unsigned, 2> sizePerThread{2, 2};
-  llvm::SmallVector<unsigned, 2> order{1, 0};
+  // =======================
+  // 3. Encoding
+  // =======================
   unsigned numWarps = 4;
   unsigned numThreadsPerWarp = 32;
+
+  // 2 means rank=2
   auto argCTALayout = ttg::CTAEncodingAttr::getDefault(ctx, 2);
-  mlir::Attribute encoding = ttg::BlockedEncodingAttr::get(ctx, shape, sizePerThread, order, numWarps, numThreadsPerWarp, argCTALayout);
-  auto argType = mlir::RankedTensorType::get(shape, elementType, encoding);
-  llvm::outs() << "argType: ";
-  llvm::outs() << argType;
+
+  // Each CTA processes a data tile of blockShape
+  llvm::SmallVector<int64_t, 2> blockShape{64, 64};
+
+  // In Triton, sizePerThread does not define the total number of elements a thread holds. 
+  // Instead, it defines the size of the contiguous chunks a thread accesses at one time.
+  // Since each CTA has 4*32 = 128 threads and blockShape = 64x64, then each thread should be responsible for 64*64/128 = 32 elements.
+  // Each thread will simply process 8 separate chunks (32 total elements / 4 elements per chunk = 8 chunks).
+  llvm::SmallVector<unsigned, 2> sizePerThread{2, 2};
+
+  // Order: dim=1 -> dim=0
+  // [row0][row1]...[rowN]
+  llvm::SmallVector<unsigned, 2> order{1, 0};
+
+  mlir::Attribute encoding = ttg::BlockedEncodingAttr::get(ctx, blockShape, sizePerThread, order, numWarps, numThreadsPerWarp, argCTALayout);
+
+  auto tensorType = mlir::RankedTensorType::get(shape, elementType, encoding);
+  llvm::outs() << "tensorType: ";
+  llvm::outs() << tensorType;
   llvm::outs() << "\n\n";
+  // Output:
+  // #blocked = #ttg.blocked<{sizePerThread = [2, 2], threadsPerWarp = [1, 32], warpsPerCTA = [4, 1], order = [1, 0]}>
+  // Read explanation in ../refs/BlockedEncoding.md
 
-  // Create FuncOp
-  auto retType = builder.getI32Type();
-  auto kernelFunc = builder.create<func::FuncOp>(loc, "triton_kernel", builder.getFunctionType({argType}, {retType}));
-  Block* kernelBody = kernelFunc.addEntryBlock();
-  builder.setInsertionPointToStart(kernelBody);
 
-  Attribute SharedMemorySpace = ttg::SharedMemorySpaceAttr::get(argType.getContext());
-  auto CTALayout = ttg::getCTALayout(argType.getEncoding());
+  // 
+  // Create ttg::MemDescType
+  // 
+  Attribute SharedMemorySpace = ttg::SharedMemorySpaceAttr::get(tensorType.getContext());
+  auto CTALayout = ttg::getCTALayout(tensorType.getEncoding());
   llvm::SmallVector<unsigned> newOrder = {1, 0};
   bool isMMAv5Fp4Padded = false;
-  auto newLayout = ttg::NVMMASharedEncodingAttr::get(argType.getContext(), argType.getShape(), newOrder, 
-                                                     CTALayout, argType.getElementType(), isMMAv5Fp4Padded);
-  auto memDescType = ttg::MemDescType::get(argType.getShape(), argType.getElementType(),
-                                           newLayout, SharedMemorySpace);
+  auto mmaEncoding = ttg::NVMMASharedEncodingAttr::get(tensorType.getContext(), tensorType.getShape(), newOrder, 
+                                                       CTALayout, tensorType.getElementType(), isMMAv5Fp4Padded);
+  auto smemTy = ttg::MemDescType::get(tensorType.getShape(), tensorType.getElementType(),
+                                      mmaEncoding, SharedMemorySpace);
 
-  llvm::outs() << "memDescType: ";
-  llvm::outs() << memDescType;
-  llvm::outs() << "\n\n";
+  llvm::outs() << "smemTy: " << smemTy << "\n\n";
 
-  auto msgToOffset = getMsgToPackedOffsetLayout(memDescType);
-  llvm::outs() << msgToOffset << "\n\n";
+  auto msgToPackedOffset = getMsgToPackedOffsetLayout(smemTy);
+  llvm::outs() << "msgToPackedOffset: " << msgToPackedOffset << "\n\n";
+
+  auto smemLayout = ttg::toLinearLayout(smemTy);
+  llvm::outs() << "smemLayout: " << smemLayout << "\n\n";
+
+  auto msgToShared = msgToPackedOffset.invertAndCompose(smemLayout);
+  llvm::outs() << "msgToShared: " << msgToShared << "\n\n";
+
+  auto msgToOffset = getMsgToUnpackedOffsetLayout(msgToPackedOffset, smemTy);
+  llvm::outs() << "msgToOffset: " << msgToOffset << "\n\n";
+
+  // 
+  // Create FuncOp
+  // 
+  auto retType = builder.getI32Type();
+  auto kernelFunc = builder.create<func::FuncOp>(loc, "triton_kernel", builder.getFunctionType({tensorType}, {retType}));
+  Block* kernelBody = kernelFunc.addEntryBlock();
+  builder.setInsertionPointToStart(kernelBody);
 
   Value c0 = builder.create<arith::ConstantIntOp>(loc, retType, 0);
   builder.create<func::ReturnOp>(loc, c0);

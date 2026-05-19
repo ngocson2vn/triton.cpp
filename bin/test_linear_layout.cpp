@@ -52,6 +52,10 @@ LinearLayout buildLayoutA(MLIRContext* ctx) {
 
 // A helper function to simulate the F2 matrix-vector multiplication
 // v = l_W|l_T|l_R
+// w = i|j = Aw = v0C0 ^ v1C1 ^ v2C2 ^ v3C3 ^ v4C4 ^ v5C5 ^ v6C6 ^ v7C7
+// j = v0C0 ^ v2C2 ^ v3C3 ^ v4C4
+// i = v1C1 ^ v5C5 ^ v6C6 ^ v7C7
+
 std::pair<int, int> applyLayoutA(MLIRContext* ctx, LinearLayout& layoutA, int v) {
   // Linear index of Register
   int v_reg    = v & 0b00000011; // Take 2 bits, its value is in [0, 1, 2, 3]
