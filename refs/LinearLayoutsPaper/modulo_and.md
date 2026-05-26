@@ -1,0 +1,1 @@
+$X \mod 2^m = X \text{ AND } (2^m - 1)$
