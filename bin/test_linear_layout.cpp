@@ -1,3 +1,5 @@
+#include <bitset>
+
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -9,6 +11,36 @@ using namespace mlir::triton;
 
 namespace tt = mlir::triton;
 
+LinearLayout buildThreadLayout(MLIRContext* ctx) {
+  auto thread = StringAttr::get(ctx, "thread");
+  auto dim1 = StringAttr::get(ctx, "dim1");
+  auto dim0 = StringAttr::get(ctx, "dim0");
+
+  // Bits 0, 1, 2 of thread point to bits 0, 1, 2 of dim1 (j)
+  // Bits 3, 4 of thread point to bits 0, 1 of dim0 (i)
+
+  // Map 8 (3 bits) thread IDs: [0, 7] to [0, 7] dim1
+  // Layout matrix is identity matrix I_3
+  auto inner = LinearLayout::identity1D(8, thread, dim1);
+
+  // Map 4 (2 bits) thread IDs: [0, 3] to [0, 3] dim0
+  // Layout matrix is identity matrix I_2
+  auto outer = LinearLayout::identity1D(4, thread, dim0);
+
+  // Mathematically, 
+  //   inner: F_2^3 -> F_2^3
+  //   outer: F_2^2 -> F_2^2
+  //   inner X outer: F_2^3 X F_2^2 -> F_2^3 X F_2^2
+  //   M1 X M2 =  [M1 0
+  //               0 M2]
+  // 
+  // operator* produces layout matrix I_5
+  // because product of 2 layouts is represented by
+  // the direct sum of 2 layout matrices
+  auto threadLayout = inner * outer;
+
+  return threadLayout;
+}
 
 LinearLayout buildLayoutA(MLIRContext* ctx) {
   // For Layout A from the paper (16x16 tensor):
@@ -108,8 +140,22 @@ int main(int argc, char** argv) {
   llvm::outs() << "LinearLayout\n";
   llvm::outs() << "========================================================================================\n";
 
-  auto layoutA = buildLayoutA(ctx);
-  llvm::outs() << "layoutA: " << layoutA << "\n\n";
+  auto threadLayout = buildThreadLayout(ctx);
+  llvm::outs() << "threadLayout: " << threadLayout << "\n\n";
+
+  auto ptr = tt::getMatrix(threadLayout);
+  auto m = ptr.get();
+  int numRows = threadLayout.getTotalOutDimSizeLog2();
+  int numCols = threadLayout.getTotalInDimSizeLog2();
+  for (int i = 0; i < numRows; i++) {
+    auto tmp_bits = std::bitset<64>(m[i]).to_string();
+    auto row_bits = tmp_bits.substr(64 - numCols, numCols);
+    std::reverse(row_bits.begin(), row_bits.end());
+    llvm::outs() << "Row " << i << ": " << row_bits << "\n";
+  }
+
+  // auto layoutA = buildLayoutA(ctx);
+  // llvm::outs() << "layoutA: " << layoutA << "\n\n";
 /*
 layoutA: 
  - register=1 -> (1, 0)
@@ -146,12 +192,21 @@ thread=16 -> l_t = b10000 -> j_T = b000, i_T = b10 -> (b000, b100) = (0, 4)
 */
 
 
-  // Test layoutA
-  int v = 0b11010101; // l_W|l_T|l_R
-  auto w = applyLayoutA(ctx, layoutA, v);
-  llvm::outs() << "v = " << v << "\n";
-  llvm::outs() << "i = " << w.first << "\n";
-  llvm::outs() << "j = " << w.second << "\n";
+  // // Sublayout
+  // auto thread = StringAttr::get(ctx, "thread");
+  // SmallVector<StringAttr> outDimNames = {
+  //   // StringAttr::get(ctx, "dim1"),
+  //   StringAttr::get(ctx, "dim0")
+  // };
+  // auto sublayout = layoutA.sublayout(thread, outDimNames);
+  // llvm::outs() << "sublayout: " << sublayout << "\n\n";
+
+  // // Test layoutA
+  // int v = 0b11010101; // l_W|l_T|l_R
+  // auto w = applyLayoutA(ctx, layoutA, v);
+  // llvm::outs() << "v = " << v << "\n";
+  // llvm::outs() << "i = " << w.first << "\n";
+  // llvm::outs() << "j = " << w.second << "\n";
 
   llvm::outs() << "\nAll done\n";
   return 0;
