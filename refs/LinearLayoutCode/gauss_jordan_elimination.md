@@ -115,7 +115,7 @@ The final goal is to transform the augmented matrix $[A \mid B]$ into $[I \mid X
 
 * Objective: Create leading ones along the main diagonal of the left matrix.
 * Process: Divide each row by its diagonal (pivot) element.
-* Result: The left matrix now has $1$s on the diagonal and $0$s below it.
+* Result: The left matrix now has $1\text{s}$ on the diagonal and $0\text{s}$ below it.
 
 ---
 

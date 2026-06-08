@@ -21,7 +21,7 @@ This means that $f(c)$ maps every $c \in [0,\, 2^6 - 1]$ to an unique output, i.
 
 #### Surjective: Domain-onto-codomain mapping
 Since $f(c)$ is an one-to-one mapping and its domain has $2^6$ unique elements, its **range** must have $2^6$ unique elements. <br/>
-In addition, its codomain $W = [0,\, 2^6 - 1]$ has exact $2^6$ unique elements. That means $f(c)$ maps its domain onto its codomain (**codomain** is identical to **range**). <br/>
+In addition, its codomain $W = [0,\, 2^6 - 1]$ has exact $2^6$ unique elements. That means $f(c)$ maps its domain onto its codomain (**range** is identical to **codomain**). <br/>
 Therefore, $f(c)$ is **surjective**.
 
 Since $f(c)$ is both **injective** and **surjective**, it is a bijection. Besides, since its codomain is identical to its domain. <br/>
