@@ -11,6 +11,18 @@ using namespace mlir::triton;
 
 namespace tt = mlir::triton;
 
+LinearLayout buildRegLayout(MLIRContext* ctx) {
+  auto reg = StringAttr::get(ctx, "register");
+  auto dim1 = StringAttr::get(ctx, "dim1");
+  auto dim0 = StringAttr::get(ctx, "dim0");
+
+  auto inner = LinearLayout::identity1D(2, reg, dim1);
+  auto outer = LinearLayout::identity1D(2, reg, dim0);
+  auto regLayout = inner * outer;
+
+  return regLayout;
+}
+
 LinearLayout buildThreadLayout(MLIRContext* ctx) {
   auto thread = StringAttr::get(ctx, "thread");
   auto dim1 = StringAttr::get(ctx, "dim1");
@@ -143,16 +155,22 @@ int main(int argc, char** argv) {
   auto threadLayout = buildThreadLayout(ctx);
   llvm::outs() << "threadLayout: " << threadLayout << "\n\n";
 
-  auto ptr = tt::getMatrix(threadLayout);
-  auto m = ptr.get();
-  int numRows = threadLayout.getTotalOutDimSizeLog2();
-  int numCols = threadLayout.getTotalInDimSizeLog2();
-  for (int i = 0; i < numRows; i++) {
-    auto tmp_bits = std::bitset<64>(m[i]).to_string();
-    auto row_bits = tmp_bits.substr(64 - numCols, numCols);
-    std::reverse(row_bits.begin(), row_bits.end());
-    llvm::outs() << "Row " << i << ": " << row_bits << "\n";
-  }
+  auto regLayout = buildRegLayout(ctx);
+  llvm::outs() << "regLayout: " << regLayout << "\n\n";
+
+  auto layout = regLayout * threadLayout;
+  llvm::outs() << "regLayout * threadLayout: " << layout << "\n\n";
+
+  // auto ptr = tt::getMatrix(threadLayout);
+  // auto m = ptr.get();
+  // int numRows = threadLayout.getTotalOutDimSizeLog2();
+  // int numCols = threadLayout.getTotalInDimSizeLog2();
+  // for (int i = 0; i < numRows; i++) {
+  //   auto tmp_bits = std::bitset<64>(m[i]).to_string();
+  //   auto row_bits = tmp_bits.substr(64 - numCols, numCols);
+  //   std::reverse(row_bits.begin(), row_bits.end());
+  //   llvm::outs() << "Row " << i << ": " << row_bits << "\n";
+  // }
 
   // auto layoutA = buildLayoutA(ctx);
   // llvm::outs() << "layoutA: " << layoutA << "\n\n";

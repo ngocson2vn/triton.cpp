@@ -83,7 +83,9 @@ target_link_libraries(triton_test PRIVATE
 
 mlir_check_all_link_libraries(triton_test)
 
+#======================================================
 # test_linear_layout
+#======================================================
 add_llvm_executable(test_linear_layout test_linear_layout.cpp PARTIAL_SOURCES_INTENDED)
 target_compile_options(test_linear_layout PRIVATE -fno-rtti -g -O0)
 llvm_update_compile_flags(test_linear_layout)
@@ -95,6 +97,22 @@ target_link_libraries(test_linear_layout PRIVATE
 
 mlir_check_all_link_libraries(test_linear_layout)
 
+#======================================================
+# test_ll_strided1D
+#======================================================
+add_llvm_executable(test_ll_strided1D test_ll_strided1D.cpp PARTIAL_SOURCES_INTENDED)
+target_compile_options(test_ll_strided1D PRIVATE -fno-rtti -g -O0)
+llvm_update_compile_flags(test_ll_strided1D)
+target_link_libraries(test_ll_strided1D PRIVATE
+  TritonTools
+  # MLIR core
+  MLIRIR
+)
+mlir_check_all_link_libraries(test_ll_strided1D)
+
+#======================================================
+# run_add_kernel
+#======================================================
 add_executable(run_add_kernel run_add_kernel.cpp)
 target_compile_options(run_add_kernel PRIVATE -fno-rtti -g -O0)
 target_link_libraries(run_add_kernel PRIVATE
