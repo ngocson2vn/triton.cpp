@@ -1,4 +1,6 @@
 build/
+lib/
+third_party/
 llvm-project/
 __pycache__/
 tmp/
