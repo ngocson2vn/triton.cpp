@@ -96,7 +96,7 @@ $L_1: \; F_2^{N_1} \rightarrow F_2^{Q_{dim1}} \times F_2^{Q_{dim0}}$
 
 $L_2: \; F_2^{N_2} \rightarrow F_2^{P_{dim1}} \times F_2^{P_{dim0}}$
 
-Take Cartesian product of $L_1$ and $L_2$:
+Take Cartesian product (direct sum) of $L_1$ and $L_2$:
 
 $L_1 \times L_2: \; F_2^{N_1} \times F_2^{N_2} \rightarrow (F_2^{Q_{dim1}} \times F_2^{Q_{dim0}}) \times (F_2^{P_{dim1}} \times F_2^{P_{dim0}})$
 
