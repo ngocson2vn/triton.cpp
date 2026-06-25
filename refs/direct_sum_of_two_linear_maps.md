@@ -90,3 +90,22 @@ This confirms that scalar multiplication holds.
 ### Conclusion
 
 Because the map $F \times G$ preserves both vector addition and scalar multiplication, **$F \times G$ is a linear map**.
+<br/><br/>
+
+In algebra, given the following two linear maps:
+
+$L_1:\; F_2^{N_1} \rightarrow F_2^{D_1}$
+
+$L_2:\; F_2^{N_2} \rightarrow F_2^{D_2}$
+
+Direct sum of $L_1$ and $L_2$:
+
+$L_1 \times L_2:\; F_2^{N_1} \times F_2^{N_2} \rightarrow F_2^{D_1} \times F_2^{D_2}$
+
+Let $\phi$ denote linear map $\phi:\; F_2^{N_1} \times F_2^{N_2} \rightarrow F_2^{N_1+N_2}$
+
+Let $T$ denote linear map $T:\; F_2^{N_1+N_2} \rightarrow F_2^{D_1} \times F_2^{D_2}$
+
+Let $\mathbf{e}_k,\; 0 \ll k < N_1 + N_2$ denote standard basis in $F_2^{N_1+N_2}$
+
+How to strictly compute $T(\mathbf{e}_k)$ via $L_1$, $L_2$, and $\phi$?

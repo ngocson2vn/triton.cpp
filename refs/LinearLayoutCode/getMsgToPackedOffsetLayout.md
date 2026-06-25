@@ -19,7 +19,7 @@ static LinearLayout getMsgToPackedOffsetLayout(ttg::MemDescType ty) {
     // The number of TMA messages
     int32_t size = shapePerCTA[dim] / blockShape[dim];
 
-    // Since one TMA op copies a tile of blockShape, each TMA op must stride over blockShape[dim]
+    // Since one TMA op copies a tile of blockShape, each TMA op must stride over blockShape[dim] per dim
     int32_t stride = blockShape[dim]
     msgToOffset *= LinearLayout::strided1D(size, stride, kMsg, outDimNames[dim]);
   }
