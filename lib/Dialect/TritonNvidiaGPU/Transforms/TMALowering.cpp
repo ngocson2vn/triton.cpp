@@ -27,6 +27,10 @@ static void
 lowerTMALoad(Operation *op, RankedTensorType tensorType, Value desc,
              function_ref<void(Value, Value, Value, Value)> createLoad,
              PatternRewriter &rewriter) {
+  auto parent = op->getParentOp();
+  llvm::outs() << "// => BEGIN lowerTMALoad\n";
+  llvm::outs() << *parent << "\n\n";
+
   MLIRContext *ctx = op->getContext();
   Attribute sharedMemorySpace = triton::gpu::SharedMemorySpaceAttr::get(ctx);
   auto loc = op->getLoc();
@@ -56,8 +60,13 @@ lowerTMALoad(Operation *op, RankedTensorType tensorType, Value desc,
   Value phase = arith::ConstantIntOp::create(rewriter, loc, 0, 32);
   WaitBarrierOp::create(rewriter, loc, barrierAlloc, phase);
   InvalBarrierOp::create(rewriter, loc, barrierAlloc);
+  llvm::outs() << "op: " << *op << "\n\n";
   replaceUsesWithLocalLoad(rewriter, op->getResult(0), alloc);
   op->erase();
+
+  llvm::outs() << "// <= END lowerTMALoad\n";
+  llvm::outs() << *parent << "\n";
+  llvm::outs() << "\n";
 }
 
 class TMALoadLowering : public OpRewritePattern<DescriptorLoadOp> {

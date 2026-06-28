@@ -92,6 +92,8 @@ struct LocalAllocOpConversion
   LogicalResult
   matchAndRewrite(triton::gpu::LocalAllocOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    llvm::outs() << "\n=== LocalAllocOpConversion ===\n";
+    llvm::outs() << "op: " << op << "\n";
     if (!op.isSharedMemoryAlloc())
       return failure();
     Location loc = op->getLoc();

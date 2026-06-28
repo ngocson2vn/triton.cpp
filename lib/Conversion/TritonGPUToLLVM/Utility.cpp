@@ -1064,10 +1064,14 @@ Value getStructFromSharedMemoryObject(Location loc,
       LLVM::LLVMStructType::getLiteral(rewriter.getContext(), types);
   // pack into struct
   Value llvmStruct = LLVM::UndefOp::create(rewriter, loc, structTy);
+  llvm::outs() << "\n=== llvmStruct ===\n";
+  llvm::outs() << llvmStruct << "\n";
   for (const auto &v : llvm::enumerate(elems)) {
     assert(v.value() && "can not insert null values");
     llvmStruct = b.insert_val(structTy, llvmStruct, v.value(), v.index());
+    llvm::outs() << llvmStruct << "\n";
   }
+  llvm::outs() << "\n";
   return llvmStruct;
 }
 

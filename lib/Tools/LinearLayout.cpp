@@ -1,6 +1,7 @@
 #include "triton/Tools/LinearLayout.h"
 
 #include <cstdint>
+#include <iostream>
 #include <set>
 #include <vector>
 
@@ -36,6 +37,55 @@ static int __builtin_ctzll(unsigned long long x) {
 }
 
 #endif
+
+
+class SonyOs {
+ public:
+  SonyOs(int level) : level_(level), os_(::llvm::outs()) {}
+
+  int level() { return level_; }
+
+  ::llvm::raw_ostream& outs() { return os_; }
+
+ private:
+  int level_;
+  ::llvm::raw_ostream& os_;
+};
+
+
+static SonyOs& getSonyOs(int level) {
+  static SonyOs os(level);
+  return os;
+}
+
+template <typename T>
+SonyOs& operator<<(SonyOs& os, T rhs) {
+  if (os.level() > 0) {
+    os.outs() << rhs;
+  }
+
+  return os;
+}
+
+namespace llvm {
+
+template <typename T>
+llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const llvm::SmallVector<T>& arr) {
+  if (arr.empty()) {
+    os << "[]";
+    return os;
+  }
+
+  os << "[" << arr[0];
+  for (int i = 1; i < arr.size(); i++) {
+    os << ", " << arr[i];
+  }
+  os << "]";
+
+  return os;
+}
+
+}
 
 namespace mlir::triton {
 
@@ -708,6 +758,19 @@ LinearLayout operator*(LinearLayout inner, LinearLayout outer) {
   auto outDims = supremum(llvm::to_vector(inner.getOutDimNames()),
                           llvm::to_vector(outer.getOutDimNames()));
 
+  int level = 1;
+  auto level_str = std::getenv("SONY_LOG_LEVEL");
+  if (level_str != nullptr) {
+    level = std::stoi(level_str);
+  }
+
+  auto& sonyOs = getSonyOs(level);
+  sonyOs << "--- operator*(LinearLayout inner, LinearLayout outer) ---\n";
+  
+  sonyOs << "inner: " << inner << "\n\n";
+
+  sonyOs << "outer: " << outer << "\n\n";
+
   // Get the sizeLog2 of all input and output dimensions we're going to
   // consider, in order.  `inner` is more minor, so its dimensions come
   // first.
@@ -726,6 +789,17 @@ LinearLayout operator*(LinearLayout inner, LinearLayout outer) {
     }
   }
 
+  sonyOs << "inDimSizesLog2:\n";
+  for (const auto& it : inDimSizesLog2) {
+    sonyOs << "  - " << it.first << ": " << it.second << "\n";
+  }
+
+  sonyOs << "outDimSizesLog2:\n";
+  for (const auto& it : outDimSizesLog2) {
+    sonyOs << "  - " << it.first << ": " << it.second << "\n";
+  }
+  sonyOs << "\n";
+
   BasesT allBases;
   for (auto [inDimName, inDimSizeLog2] : inDimSizesLog2) {
     std::vector<std::vector<int32_t>> &inDimBases = allBases[inDimName];
@@ -734,8 +808,7 @@ LinearLayout operator*(LinearLayout inner, LinearLayout outer) {
     inDimBases = std::vector<std::vector<int32_t>>(
         inDimSizeLog2, std::vector<int32_t>(outDimSizesLog2.size(), 0));
 
-    for (auto [outDimIdx, outDimNameAndSize] :
-         llvm::enumerate(outDimSizesLog2)) {
+    for (auto [outDimIdx, outDimNameAndSize] : llvm::enumerate(outDimSizesLog2)) {
       auto [outDimName, outDimSize] = outDimNameAndSize;
       if (inner.hasInDim(inDimName) && inner.hasOutDim(outDimName)) {
         for (int i = 0; i < inner.getInDimSizeLog2(inDimName); i++) {
@@ -743,14 +816,10 @@ LinearLayout operator*(LinearLayout inner, LinearLayout outer) {
         }
       }
       if (outer.hasInDim(inDimName) && outer.hasOutDim(outDimName)) {
-        int offset =
-            inner.hasInDim(inDimName) ? inner.getInDimSizeLog2(inDimName) : 0;
-        int shift = inner.hasOutDim(outDimName)
-                        ? inner.getOutDimSizeLog2(outDimName)
-                        : 0;
+        int offset = inner.hasInDim(inDimName)   ? inner.getInDimSizeLog2(inDimName)   : 0;
+        int shift  = inner.hasOutDim(outDimName) ? inner.getOutDimSizeLog2(outDimName) : 0;
         for (int i = 0; i < outer.getInDimSizeLog2(inDimName); i++) {
-          inDimBases[offset + i][outDimIdx] =
-              outer.getBasis(inDimName, i, outDimName) << shift;
+          inDimBases[offset + i][outDimIdx] = outer.getBasis(inDimName, i, outDimName) << shift;
         }
       }
     }
@@ -760,8 +829,13 @@ LinearLayout operator*(LinearLayout inner, LinearLayout outer) {
   for (auto [outDim, sizeLog2] : outDimSizesLog2) {
     outDimSizes.push_back({outDim, 1 << sizeLog2});
   }
-  return LinearLayout(std::move(allBases), outDimSizes,
+  auto result = LinearLayout(std::move(allBases), outDimSizes,
                       inner.isSurjective() && outer.isSurjective());
+  
+  sonyOs << "result: " << result << "\n";
+  sonyOs << "---------------------------------------------------------\n\n";
+
+  return result;
 }
 
 bool LinearLayout::isTrivialOver(ArrayRef<StringAttr> dimNames) const {
@@ -835,6 +909,9 @@ LinearLayout LinearLayout::sublayout(ArrayRef<StringAttr> inDimNames,
       outDimIndicesToKeep.push_back(i);
     }
   }
+
+  llvm::outs() << "\noutDimIndicesToKeep: " << outDimIndicesToKeep << "\n\n";
+
   BasesT newBases;
   for (auto [inDim, inDimBases] : bases) {
     if (!inDimSet.contains(inDim)) {
@@ -1360,6 +1437,7 @@ std::string ColumnAction::toString() const {
 // This function is called from the constructor of LinearLayout, so be careful
 // not to use any functions that create LLs in here.
 std::unique_ptr<uint64_t[]> getMatrix(const LinearLayout &layout) {
+  // llvm::outs() << "\n--------- getMatrix ---------\n";
   int numRows = layout.getTotalOutDimSizeLog2();
   int numCols = layout.getTotalInDimSizeLog2();
 
@@ -1386,21 +1464,40 @@ std::unique_ptr<uint64_t[]> getMatrix(const LinearLayout &layout) {
   //
   // Note `new uint64_t[n]()` is zero-initialized, but `new uint64_t[n]` is not.
   std::unique_ptr<uint64_t[]> m(new uint64_t[numRows]());
+  // Row index
   int r = 0;
+
+  // For each outDim
   for (StringAttr outDim : layout.getOutDimNames()) {
+    // Column index
     int c = 0;
+
+    // Since each inDim contributes some bits to outDim,
+    // need to loop over inDims
     for (StringAttr inDim : layout.getInDimNames()) {
+
+      // // Loop over the number of inDim bits
       for (int i = 0; i < layout.getInDimSizeLog2(inDim); i++) {
+
+        // Get the transformed i-th basis vector of inDim
         uint64_t basis = layout.getBasis(inDim, i, outDim);
+        // llvm::outs() << "inDim = " << inDim << " i = " << i << " outDim = " << outDim << " basis = " << basis << "\n";
+
+        // Loop over the number of outDim bits
+        // Each outDim bit corresponds to one row
         for (int j = 0; j < layout.getOutDimSizeLog2(outDim); j++) {
+          // m[r + j] = m[r + j] OR (j-th bit of basis) * 2^c
           m[r + j] |= ((basis >> j) & 1) << c;
         }
         c++;
       }
     }
+
     r += layout.getOutDimSizeLog2(outDim);
+    // llvm::outs() << "\n";
   }
 
+  // llvm::outs() << "-----------------------------\n\n";
   return m;
 }
 

@@ -125,8 +125,8 @@ SmallVector<int64_t> getTMABlockShape(ArrayRef<int64_t> shapePerCTA,
   if (fp4Padded) {
     blockShape[contigDim] *= 2;
   }
-  // All dimensions must be at most 256
-  constexpr int64_t dimMax = 256;
+  // All dimensions must be at most 64
+  constexpr int64_t dimMax = 64;
   for (auto &size : blockShape) {
     size = std::min(size, dimMax);
   }

@@ -59,6 +59,9 @@ struct InitBarrierOpConversion
   LogicalResult
   matchAndRewrite(triton::nvidia_gpu::InitBarrierOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    llvm::outs() << "\n=== InitBarrierOpConversion ===\n";
+    llvm::outs() << op << "\n";
+
     Location loc = op->getLoc();
     auto b = TritonLLVMOpBuilder(loc, rewriter);
     auto smemObj = LLVM::getSharedMemoryObjectFromStruct(

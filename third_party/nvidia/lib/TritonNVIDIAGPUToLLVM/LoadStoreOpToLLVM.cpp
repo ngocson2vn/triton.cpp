@@ -1310,6 +1310,9 @@ struct AsyncTMACopyGlobalToLocalOpConversion
   matchAndRewrite(triton::nvidia_gpu::AsyncTMACopyGlobalToLocalOp op,
                   OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    llvm::outs() << "\n=== AsyncTMACopyGlobalToLocalOpConversion ===\n";
+    llvm::outs() << op << "\n\n";
+
     if (op.getCache() != triton::CacheModifier::NONE)
       return op.emitError("cache modifiers not supported yet");
     if (op.getEvict() != triton::EvictionPolicy::NORMAL)
@@ -1320,6 +1323,8 @@ struct AsyncTMACopyGlobalToLocalOpConversion
     auto loc = op.getLoc();
     auto b = TritonLLVMOpBuilder(loc, rewriter);
     ttg::MemDescType dstTy = op.getResult().getType();
+    llvm::outs() << "dstTy: " << dstTy << "\n\n";
+
     Type llvmElemTy = typeConverter->convertType(dstTy.getElementType());
     auto barrierMemObj = LLVM::getSharedMemoryObjectFromStruct(
         loc, adaptor.getBarrier(),
@@ -1401,6 +1406,8 @@ struct AsyncTMACopyGlobalToLocalOpConversion
       operands.push_back(
           ptxBuilderTMA.newOperand(barrierMemObj.getBase(), "r"));
       tmaInst += "}], [$" + std::to_string(operandIdx++) + "];";
+
+      llvm::outs() << tmaInst << "\n\n";
 
       auto &tma = *ptxBuilderTMA.create(tmaInst);
       tma(operands, /*onlyAttachMLIRArgs=*/true);

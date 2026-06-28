@@ -24,6 +24,8 @@
 #include "triton/Conversion/TritonGPUToLLVM/PatternTritonGPUOpToLLVM.h"
 #include "triton/Conversion/TritonGPUToLLVM/TypeConverter.h"
 
+#include "mlir/IR/AsmState.h"
+
 namespace mlir {
 namespace triton {
 #define GEN_PASS_DEF_CONVERTTRITONGPUTOLLVM
@@ -101,6 +103,11 @@ struct ConvertTritonGPUToLLVM
     if (failed(
             applyPartialConversion(mod, funcTarget, std::move(funcPatterns))))
       return signalPassFailure();
+
+    llvm::outs() << "// After applying FuncOpConversion\n";
+    auto& funcOp = mod.getBodyRegion().front().front();
+    llvm::outs() << funcOp << "\n";
+    llvm::outs() << "\n\n";
 
     // initSharedMemory is run before the conversion of call and ret ops,
     // because the call op has to know the shared memory base address of each

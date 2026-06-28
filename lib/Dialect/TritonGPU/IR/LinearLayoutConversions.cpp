@@ -18,6 +18,59 @@
 using mlir::triton::nvidia_gpu::TensorMemoryEncodingAttr;
 using mlir::triton::nvidia_gpu::TensorMemoryScalesEncodingAttr;
 
+// ADL kicks in 
+namespace llvm {
+
+template <typename T>
+llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const llvm::SmallVector<T>& arr) {
+  if (arr.empty()) {
+    os << "[]";
+    return os;
+  }
+
+  os << "[" << arr[0];
+  for (int i = 1; i < arr.size(); i++) {
+    os << ", " << arr[i];
+  }
+  os << "]";
+
+  return os;
+}
+
+template <typename T>
+llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const llvm::ArrayRef<T>& arr) {
+  if (arr.empty()) {
+    os << "[]";
+    return os;
+  }
+
+  os << "[" << arr[0];
+  for (int i = 1; i < arr.size(); i++) {
+    os << ", " << arr[i];
+  }
+  os << "]";
+
+  return os;
+}
+
+template <typename T, std::size_t N>
+llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const std::array<T, N>& arr) {
+  if (arr.empty()) {
+    os << "[]";
+    return os;
+  }
+
+  os << "[" << arr[0];
+  for (int i = 1; i < arr.size(); i++) {
+    os << ", " << arr[i];
+  }
+  os << "]";
+
+  return os;
+}
+
+}
+
 namespace mlir::triton::gpu {
 namespace {
 
@@ -159,6 +212,7 @@ sharedToLinearLayoutAMDRotating(ArrayRef<int64_t> shape,
 // Returns the layout of a single core matrix which tiles the nvmma layout
 LinearLayout getCoreMatrixLinearLayout(NVMMASharedEncodingAttr shared,
                                        bool disableSwizzle) {
+  llvm::outs() << "\n=> getCoreMatrixLinearLayout:\n";
   auto *ctx = shared.getContext();
 
   int elemBitWidth = shared.getElementBitWidth();
@@ -168,8 +222,12 @@ LinearLayout getCoreMatrixLinearLayout(NVMMASharedEncodingAttr shared,
   int maxPhase = shared.getMaxPhase();
 
   int tileRows = 8;
+  llvm::outs() << "tileRows: " << tileRows << "\n";
   int tileCols = 8 * std::max(16, tileWidthBytes) / elemBitWidth;
+  llvm::outs() << "tileCols: " << tileCols << "\n";
   bool isFp4Padded = shared.getFp4Padded();
+
+  llvm::outs() << "\n";
 
   std::vector<std::vector<int>> bases2D;
   for (int col = 1; col < tileCols; col *= 2) {
@@ -193,7 +251,9 @@ LinearLayout getCoreMatrixLinearLayout(NVMMASharedEncodingAttr shared,
       int colPacked = colPadded / 16 * 8 + colPadded % 8;
       bases2D.push_back({row, colPacked});
     } else {
-      bases2D.push_back({row, vec * ((row / perPhase) % maxPhase)});
+      auto shift = vec * ((row / perPhase) % maxPhase);
+      llvm::outs() << "shift = " << shift << "\n";
+      bases2D.push_back({row, shift});
     }
   }
   auto outDimNames = standardOutDimNames(ctx, 2);
@@ -203,12 +263,20 @@ LinearLayout getCoreMatrixLinearLayout(NVMMASharedEncodingAttr shared,
 LinearLayout nvmmaSharedToLinearLayout(ArrayRef<int64_t> shape,
                                        NVMMASharedEncodingAttr shared,
                                        bool disableSwizzle) {
+  llvm::outs() << "\n--- nvmmaSharedToLinearLayout ---\n";
+
+  llvm::outs() << "shared: " << shared << "\n\n";
+
   MLIRContext *ctx = shared.getContext();
   int rank = shape.size();
   auto shapePerCTA = getShapePerCTA(shared, shape);
+  llvm::outs() << "shapePerCTA: " << shapePerCTA << "\n";
+
   auto kOffset = S("offset");
   auto tmaShape = triton::nvidia_gpu::getTMABlockShape(shared, shapePerCTA,
                                                        /*packedSize=*/true);
+  llvm::outs() << "tmaShape: " << tmaShape << "\n";
+
   if (shared.getSwizzlingByteWidth() == 0) {
     auto outDimNames = standardOutDimNames(ctx, rank);
     LinearLayout layout = LinearLayout::identity1D(tmaShape[rank - 1], kOffset,
@@ -226,11 +294,17 @@ LinearLayout nvmmaSharedToLinearLayout(ArrayRef<int64_t> shape,
   std::array<int64_t, 2> collapsedTmaShape{1, tmaShape.back()};
   for (int i = 0; i + 1 < rank; i++)
     collapsedTmaShape[0] *= tmaShape[i];
+
+  llvm::outs() << "collapsedTmaShape: " << collapsedTmaShape << "\n";
+
   if (shared.getTransposed()) {
     std::swap(collapsedTmaShape[0], collapsedTmaShape[1]);
   }
 
+  // tileLayout maps 1D Memory Offsets to logical tensor indices (i, j)
   auto tileLayout = getCoreMatrixLinearLayout(shared, disableSwizzle);
+  llvm::outs() << "\ntileLayout (CoreMatrixLinearLayout): " << tileLayout << "\n";
+
   auto outDimNames = standardOutDimNames(ctx, 2);
   auto kRow = outDimNames[0];
   auto kCol = outDimNames[1];
@@ -251,6 +325,8 @@ LinearLayout nvmmaSharedToLinearLayout(ArrayRef<int64_t> shape,
   // Distribute the remaining rows and cols.
   auto layout =
       ensureLayoutNotSmallerThan(tileLayout, outDimNames, collapsedTmaShape);
+
+  llvm::outs() << "\nlayout: " << layout << "\n";
 
   // Reshape the layout to the N-D pre-transposed shape per CTA.
   SmallVector<int64_t> maybeTransposedTmaShape = tmaShape;
@@ -275,7 +351,14 @@ LinearLayout nvmmaSharedToLinearLayout(ArrayRef<int64_t> shape,
   reshapedLayout = ensureLayoutNotSmallerThan(
       reshapedLayout, standardOutDimNames(ctx, shapePerCTA.size()),
       shapePerCTA);
-  return combineCtaCgaWithShape(reshapedLayout, shared.getCTALayout(), shape);
+
+  llvm::outs() << "\nreshapedLayout: " << reshapedLayout << "\n";
+
+  auto ret = combineCtaCgaWithShape(reshapedLayout, shared.getCTALayout(), shape);
+
+  llvm::outs() << "---------------------------------\n\n";
+
+  return ret;
 }
 
 /// Function to generate lane and warp layout for dot operands.
@@ -1231,8 +1314,14 @@ LinearLayout toLinearLayout(MemDescType type) {
   // trim the allocationShape to the shape if they are different.
   // We also remove the first dimension of the allocationShape if there was a
   // call to memdesc_index
+  llvm::outs() << "\n";
+  llvm::outs() << "--- toLinearLayout(MemDescType type) ---\n";
   auto shape = type.getAllocShape().take_back(type.getRank());
-  return toLinearLayout(shape, type.getEncoding());
+  llvm::outs() << "shape = " << shape << "\n\n";
+  auto encoding = type.getEncoding();
+  llvm::outs() << "encoding = " << encoding << "\n";
+  llvm::outs() << "----------------------------------------\n\n";
+  return toLinearLayout(shape, encoding);
 }
 
 LinearLayout toLinearLayout(TensorOrMemDesc type) {
