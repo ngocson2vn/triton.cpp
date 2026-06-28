@@ -78,7 +78,7 @@ static LinearLayout getMsgToPackedOffsetLayout(ttg::MemDescType ty) {
     // msg = 1 -> dim1 = 1 * 64 = 64
     auto layout = LinearLayout::strided1D(shapePerCTA[dim] / blockShape[dim],
                                           blockShape[dim], kMsg, outDimNames[dim]);
-    llvm::outs() << "dim = " << dim << ", layout:";
+    llvm::outs() << outDimNames[dim] << " layout:";
     llvm::outs() << layout << "\n\n";
     msgToOffset *= layout;
   }
@@ -93,11 +93,12 @@ static LinearLayout getMsgToPackedOffsetLayout(ttg::MemDescType ty) {
   for (int i = 0; i < rank; ++i) {
     auto dim = CTAOrder[i];
     auto layout = LinearLayout::identity1D(CTASplitNum[dim], kBlock, outDimNames[dim]);
-    llvm::outs() << "dim = " << dim << ", layout:";
+    llvm::outs() << outDimNames[dim] << " layout:";
     llvm::outs() << layout << "\n\n";
     msgToOffset *= layout;
   }
 
+  llvm::outs() << "Final msgToOffset: " << msgToOffset << "\n";
   llvm::outs() << "----------------------------------\n\n";
 
   return msgToOffset;
