@@ -6,12 +6,12 @@ Here is the mathematical proof of the final assembly.
 
 ### Step 1: Decomposing the 1D Offset
 
-Let’s assume a `tileCols` width of $W$. Because Triton requires $W$ to be a power of 2 (e.g., $W = 64 = 2^6$), any 1D memory offset $x$ can be cleanly split into two non-overlapping binary fields:
+Let's assume a `tileCols` width of $W$. Because Triton requires $W$ to be a power of 2 (e.g., $W = 64 = 2^6$), any 1D memory offset $x$ can be cleanly split into two non-overlapping binary fields:
 
 1. **Lower bits:** The base column index $c$, where $c < W$.
 2. **Upper bits:** The row index $r$.
 
-In standard arithmetic, $x = (r \times W) + c$.
+In standard arithmetic, $x = (r \times W) + c$. <br/>
 Because $W$ is a power of 2, the bit ranges for $r$ and $c$ never overlap. Therefore, standard addition is perfectly equivalent to bitwise XOR:
 
 
@@ -19,7 +19,7 @@ $$x = (r \times W) \oplus c$$
 
 ### Step 2: Defining the Basis Vectors
 
-Triton’s `getCoreMatrixLinearLayout` assigns a 2D basis vector $\mathbf{b}_i$ to every bit position $i$ of the offset $x$.
+Triton's `getCoreMatrixLinearLayout` assigns a 2D basis vector $\mathbf{b}_i = L(e_i)$ to every bit position $i$ of the offset $x$.
 
 * **For the lower bits (columns):** The bit $j$ belongs to the base column $c$. Its basis vector simply increments the column:
 

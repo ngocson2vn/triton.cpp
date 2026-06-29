@@ -26,9 +26,10 @@ Denote that
 - $i_T$ be the local row index of a thread, $i_T \in [0, 3]$ (represented by 2 bits).
 - $j_T$ be the local column index of a thread, $j_T \in [0, 7]$ (represented by 3 bits).
 - $l_T$ be the 1D linear index of a thread, $l_T \in [0, 31]$ (represented by 5 bits).
-- `|` is the bit concatenation operator.
+- $W_T$ be the number of thread columns.
+- $\oplus$ be the bitwise XOR operator.
 
-We will prove that $l_T = i_T | j_T$.
+We will prove that $l_T = (i_T \ll W_T) \oplus j_T$.
 
 ### 1. Linear Index Axiom
 In any standard 2D array or grid, to find the 1D linear index of an element, you use the standard row-major indexing formula:<br/>
@@ -55,9 +56,9 @@ Now, look at $j_T$. Because $j_T \in [0, 7]$, it requires exactly 3 bits to repr
 
 Because $j_T$ perfectly fits into the 3 empty zero slots created by shifting $i_T$, **adding them together will never cause a binary carry.** The bits are strictly non-overlapping.
 
-Therefore, the arithmetic addition is strictly equivalent to the bitwise OR/concatenation operator (which we represent as `|`): <br/>
+Therefore, the arithmetic addition is strictly equivalent to the bitwise XOR operator (which we represent as $\oplus$): <br/>
 $l_T = (i_T \ll 3) + j_T$ <br/>
-$l_T = i_T \mid j_T$
+$l_T = (i_T \ll 3) \oplus j_T$
 
 ## Linear Warp Indices
 $l_W = i_W$ since Number of Warp Columns is $2^0$ and $j_W = 0$.

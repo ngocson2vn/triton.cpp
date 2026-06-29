@@ -243,6 +243,12 @@ LinearLayout getCoreMatrixLinearLayout(NVMMASharedEncodingAttr shared,
       bases2D.push_back({0, col});
     }
   }
+
+  llvm::outs() << "vec = " << vec << "\n";
+  llvm::outs() << "perPhase = " << perPhase << "\n";
+  llvm::outs() << "maxPhase = " << maxPhase << "\n";
+  llvm::outs() << "S(row) = vec * ((row / perPhase) % maxPhase)\n";
+
   for (int row = 1; row < tileRows; row *= 2) {
     if (disableSwizzle) {
       bases2D.push_back({row, 0});
