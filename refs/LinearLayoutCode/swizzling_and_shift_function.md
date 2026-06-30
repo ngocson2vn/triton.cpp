@@ -207,3 +207,186 @@ For $m \le k \lt m + n$: <br/>
 $Z(\boldsymbol{e}_k) = (\boldsymbol{0}^m, L_2(\boldsymbol{v}_{k-m}) \oplus S(\boldsymbol{0}^m)) = (\boldsymbol{0}^m, L_2(\boldsymbol{v}_{k-m}))$
 
 $Z$ is called a swizzling linear map.
+
+<br/><br/>
+Given the following linear maps:
+
+$S(\boldsymbol{r}) :\ F_2^m \rightarrow F_2^n$
+
+$
+\begin{aligned}
+\Omega: F_2^m \times F_2^n \rightarrow F_2^m \times F_2^n \\
+(\boldsymbol{r}, \boldsymbol{c}) \mapsto (\boldsymbol{r}, \boldsymbol{c} \oplus S(\boldsymbol{r}))
+\end{aligned}
+$
+
+$
+\begin{aligned}
+L:\ F_2^{m+n} &\rightarrow F_2^m \times F_2^n \\
+\boldsymbol{o} &\mapsto (\boldsymbol{r}, \boldsymbol{c})
+\end{aligned}
+$
+
+Then $Z = \Omega \circ L$ is called a swizzling linear map:
+
+$
+\begin{aligned}
+Z:\ F_2^{m+n} &\rightarrow F_2^m \times F_2^n \\
+\boldsymbol{o} &\mapsto (\boldsymbol{r}, \boldsymbol{c} \oplus S(\boldsymbol{r}))
+\end{aligned}
+$
+
+
+
+## How does $Z$ help resolve GPU Shared Memory Bank Conflicts?
+
+Firstly, we prove that the swizzling linear map $Z = \Omega \circ L$ is invertible. 
+
+We can evaluate the invertibility of its component maps, $L$ and $\Omega$. <br/>
+A composition of two functions is invertible if and only if both individual functions are invertible.
+
+Here is the step-by-step proof.
+
+### 1. Invertibility of $L$
+
+The map $L: F_2^{m+n} \rightarrow F_2^m \times F_2^n$ takes a vector $\boldsymbol{o}$ of length $m+n$ and splits it into two vectors: $\boldsymbol{r}$ of length $m$ and $\boldsymbol{c}$ of length $n$.
+
+This is the canonical isomorphism between a vector space and the direct sum of its subspaces. Because it merely partitions the coordinates of $\boldsymbol{o}$ without losing or altering any information, $L$ is a clear bijection.
+
+* **Inverse of $L$:** The inverse function $L^{-1}$ simply concatenates the two vectors back together: $L^{-1}(\boldsymbol{r}, \boldsymbol{c}) = \boldsymbol{o}$.
+
+### 2. Invertibility of $\Omega$
+
+The map $\Omega: F_2^m \times F_2^n \rightarrow F_2^m \times F_2^n$ is defined by:
+$\Omega(\boldsymbol{r}, \boldsymbol{c}) = (\boldsymbol{r}, \boldsymbol{c} \oplus S(\boldsymbol{r}))$
+
+We can prove $\Omega$ is invertible by demonstrating that it is an **involution** (a function that is its own inverse). Let's apply $\Omega$ to its own output:
+
+$\Omega(\Omega(\boldsymbol{r}, \boldsymbol{c})) = \Omega(\boldsymbol{r}, \boldsymbol{c} \oplus S(\boldsymbol{r}))$
+
+By the definition of $\Omega$, we map the first argument identically, and the second argument gets XORed with $S$ applied to the first argument:
+
+$\Omega(\boldsymbol{r}, \boldsymbol{c} \oplus S(\boldsymbol{r})) = (\boldsymbol{r}, (\boldsymbol{c} \oplus S(\boldsymbol{r})) \oplus S(\boldsymbol{r}))$
+
+Because vector addition over the finite field $F_2$ is equivalent to the bitwise XOR operation, any element added to itself results in the zero vector (i.e., $x \oplus x = 0$). Also, vector addition in $F_2$ is associative. Therefore:
+
+$\boldsymbol{c} \oplus (S(\boldsymbol{r}) \oplus S(\boldsymbol{r})) = \boldsymbol{c} \oplus \boldsymbol{0} = \boldsymbol{c}$
+
+Substituting this back gives:
+
+$\Omega(\Omega(\boldsymbol{r}, \boldsymbol{c})) = (\boldsymbol{r}, \boldsymbol{c})$
+
+Since applying $\Omega$ twice returns the original input, $\Omega$ is its own inverse ($\Omega^{-1} = \Omega$). Because it has a well-defined inverse, $\Omega$ is bijective and therefore invertible.
+
+### 3. Conclusion for $Z$
+
+The map $Z$ is defined as the composition of $\Omega$ and $L$:
+
+$Z = \Omega \circ L$
+
+Since both $\Omega$ and $L$ are invertible (bijective) mappings, their composition $Z$ must also be strictly invertible.
+
+We can even construct the explicit inverse map, $Z^{-1} : F_2^m \times F_2^n \rightarrow F_2^{m+n}$, using the property of inverse compositions $(A \circ B)^{-1} = B^{-1} \circ A^{-1}$:
+
+$Z^{-1} = L^{-1} \circ \Omega^{-1}$
+
+Since we established that $\Omega^{-1} = \Omega$, we can simplify this to:
+
+$Z^{-1}(\boldsymbol{r}, \boldsymbol{c}) = L^{-1}(\Omega(\boldsymbol{r}, \boldsymbol{c})) = L^{-1}(\boldsymbol{r}, \boldsymbol{c} \oplus S(\boldsymbol{r}))$
+
+Thus, $Z$ is mathematically invertible, mapping any pair $(\boldsymbol{r}, \boldsymbol{c})$ back to its original combined vector form in $F_2^{m+n}$.
+
+<br/>
+
+When a warp read a column of a tensor with `shape=(m, n)`, the following pipeline happens inside each thread:
+
+**1. Take $(\boldsymbol{r}, \boldsymbol{c})$ coordinate**
+
+Each thread identifies the logical 2D element it is responsible for reading or writing.
+
+**2. Compute 1D offset $o$ from $(\boldsymbol{r}, \boldsymbol{c})$ by applying $Z^{-1}$**
+
+The thread computes a **swizzled 1D physical offset** using $Z^{-1}$.
+
+Let's look at the formula for $Z^{-1}$ that we derived earlier:
+
+
+$Z^{-1}(\boldsymbol{r}, \boldsymbol{c}) = L^{-1}(\boldsymbol{r}, \boldsymbol{c} \oplus S(\boldsymbol{r}))$
+
+In C++ or CUDA code, this mathematical map translates directly to:
+
+```cpp
+// S(r) is often implemented as a bit-shift, e.g., (r >> 1) or just r depending on matrix tile size
+int swizzled_c = c ^ S(r); 
+int o = (r * row_stride) + swizzled_c; // This is L^-1
+```
+
+Because $Z$ is perfectly invertible, no two different $(\boldsymbol{r}, \boldsymbol{c})$ pairs will ever produce the same offset $o$.
+
+To understand why `(r * row_stride) + swizzled_c` perfectly embodies the mathematical inverse map $L^{-1}$, we need to look at how abstract vector concatenation in the finite field $F_2$ translates into standard computer arithmetic.
+
+Here is the breakdown of why this line of C++/CUDA code is the literal implementation of $L^{-1}$.
+
+#### The Mathematical Definition of $L^{-1}$
+
+Recall our original map $L$: it takes a single vector $\boldsymbol{o}$ of length $m+n$ and splits it into a row vector $\boldsymbol{r}$ (length $m$) and a column vector $\boldsymbol{c}$ (length $n$).
+
+Therefore, the inverse map $L^{-1}$ must do the exact opposite. It takes the pair $(\boldsymbol{r}, \boldsymbol{c})$ and **concatenates** them side-by-side to reconstruct the $(m+n)$-bit vector $\boldsymbol{o}$:
+
+
+$L^{-1}(\boldsymbol{r}, \boldsymbol{c}) = [\boldsymbol{r} \text{ bits}] \text{ concatenated with } [\boldsymbol{c} \text{ bits}]$
+
+#### Concatenation in Hardware
+
+In a computer, variables like `r` and `swizzled_c` are just binary bit-strings. Suppose `swizzled_c` represents an $n$-bit column index.
+
+To concatenate the bits of `r` and `swizzled_c` into a single integer, you cannot just add them together normally. You first have to shift the bits of `r` to the left by $n$ positions to make room for the $n$ bits of `swizzled_c`.
+In bitwise logic, concatenation looks like this:
+`o = (r << n) | swizzled_c`
+
+#### Bit-Shifting is Multiplication
+
+In binary arithmetic, shifting a number to the left by $n$ bits is mathematically identical to multiplying that number by $2^n$.
+
+
+$r \ll n \equiv r \times 2^n$
+
+In GPU programming, shared memory blocks are almost always sized as powers of 2 (e.g., 16, 32, or 64 elements wide) to align with warp boundaries. Therefore, the width of a row—the **`row_stride`**—is exactly $2^n$.
+
+By substituting `row_stride` for $2^n$, our bit-shift becomes standard integer multiplication:
+`r * row_stride`
+
+At this point, the bits of `r` are sitting in the upper $m$ positions of the integer, and the lower $n$ positions are entirely filled with zeros.
+
+#### Addition is Concatenation (Over $F_2$)
+
+Because the lower $n$ bits of `(r * row_stride)` are all zeros, adding `swizzled_c` to it using the standard `+` operator will not trigger any arithmetic carries.
+
+When there are no carries, arithmetic addition (`+`), bitwise OR (`|`), and bitwise XOR (`^`) all produce the exact same result: they simply drop the bits of `swizzled_c` into those empty zero slots.
+
+#### Conclusion
+
+By piecing this together, we can map the math directly to the code:
+
+1. **$L^{-1}$ requires concatenation:** We must attach the $n$-bit column vector to the $m$-bit row vector.
+2. **Make room for the column:** `r * row_stride` shifts the row bits left by $n$ positions.
+3. **Attach the column:** `+ swizzled_c` drops the swizzled column bits into the newly opened $n$ positions.
+
+Therefore, the algebraic expression $L^{-1}(\boldsymbol{r}, \boldsymbol{c} \oplus S(\boldsymbol{r}))$ directly compiles down to:
+`int o = (r * row_stride) + swizzled_c;`
+
+**3. Compute the physical shared memory location**
+
+The thread takes the shared memory base pointer and adds $o$ (scaled by the byte size of the data type) to get the exact memory address in the GPU's SRAM.
+
+**4. Send the physical shared memory location to GPU**
+
+The thread executes a shared memory load instruction (e.g., `ld.shared`).
+
+**5. GPU computes bank ID and byte offset**
+
+The GPU hardware receives the physical address and routes it to the memory banks.
+For 32-bit words, the hardware calculates the bank ID using a simple modulo operation:
+`Bank ID = (Physical Address / 4) % 32`
+
+Because your offset $o$ in Step 2 was constructed using the XOR swizzle ($\boldsymbol{c} \oplus S(\boldsymbol{r})$), threads reading down a column (same $\boldsymbol{c}$, different $\boldsymbol{r}$) will inherently calculate different values for $o$. When the hardware applies the modulo 32 operation in Step 5, those different physical addresses gracefully route to completely different Bank IDs, bypassing the conflict entirely!
