@@ -5,6 +5,18 @@
   "version": "0.2.0",
   "configurations": [
     {
+        "name": "triton_debug",
+        "type": "lldb-dap",
+        "request": "launch",
+        "initCommands": [
+            "command script import ${workspaceFolder}/llvm-project/llvm/utils/lldbDataFormatters.py"
+        ],
+        "program": "${workspaceFolder}/build/bin/triton_debug",
+        "cwd": "${workspaceFolder}/",
+        "args": ["./async_tma_copy_global_to_local.ttngir"],
+        "env": {}
+    },
+    {
         "name": "triton_test",
         "type": "lldb-dap",
         "request": "launch",

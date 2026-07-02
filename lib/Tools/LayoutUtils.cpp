@@ -128,6 +128,7 @@ LinearLayout ensureLayoutNotSmallerThan(
     int32_t actualSize = layout.getOutDimSize(outDimName);
     int32_t desiredSize = shape.lookup(outDimName);
     assert(actualSize > desiredSize || desiredSize % actualSize == 0);
+    llvm::outs() << "desiredSize = " << desiredSize << ", actualSize = " << actualSize << ", outDimName = " << outDimName.str() << "\n";
     ret *= LinearLayout::identity1D(desiredSize / actualSize, kDim, outDimName);
     assert(ret.getOutDimSize(outDimName) >= desiredSize);
   }

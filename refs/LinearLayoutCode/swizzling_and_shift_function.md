@@ -176,10 +176,10 @@ $
 $
 
 For $0 \le k \lt m$: <br/>
-$L(\boldsymbol{e}_k) = (L_1(\boldsymbol{u}_k), \boldsymbol{0}^n)$, where $\boldsymbol{u}_k$ is $k$-th standard basis vector of $F_2^m$
+$L(\boldsymbol{e}_k) = (L_1(\boldsymbol{u}_k), \boldsymbol{0}^n) = (\boldsymbol{u}_k, \boldsymbol{0}^n)$, where $\boldsymbol{u}_k$ is $k$-th standard basis vector of $F_2^m$
 
 For $m \le k \lt m + n$: <br/>
-$L(\boldsymbol{e}_k) = (\boldsymbol{0}^m, L_2(\boldsymbol{v}_{k-m}))$, where $\boldsymbol{v}_h$ is $h$-th standard basis vector of $F_2^n$
+$L(\boldsymbol{e}_k) = (\boldsymbol{0}^m, L_2(\boldsymbol{v}_{k-m})) = (\boldsymbol{0}^m, \boldsymbol{v}_{k-m})$, where $\boldsymbol{v}_h$ is $h$-th standard basis vector of $F_2^n$
 
 <br/>
 
@@ -201,42 +201,13 @@ Denote $Z = \Omega \circ L:\ F_2^{m + n} \rightarrow F_2^m \times F_2^n$
 Then, we can compute $Z(\boldsymbol{e}_k)$ as follows:
 
 For $0 \le k \lt m$: <br/>
-$Z(\boldsymbol{e}_k) = (L_1(\boldsymbol{u}_k), \boldsymbol{0}^n \oplus S(L_1(\boldsymbol{u}_k))) = (L_1(\boldsymbol{u}_k), S(L_1(\boldsymbol{u}_k)))$
+$Z(\boldsymbol{e}_k) = (\boldsymbol{u}_k, \boldsymbol{0}^n \oplus S(\boldsymbol{u}_k)) = (\boldsymbol{u}_k, S(\boldsymbol{u}_k))$
 
 For $m \le k \lt m + n$: <br/>
-$Z(\boldsymbol{e}_k) = (\boldsymbol{0}^m, L_2(\boldsymbol{v}_{k-m}) \oplus S(\boldsymbol{0}^m)) = (\boldsymbol{0}^m, L_2(\boldsymbol{v}_{k-m}))$
+$Z(\boldsymbol{e}_k) = (\boldsymbol{0}^m, \boldsymbol{v}_{k-m} \oplus S(\boldsymbol{0}^m)) = (\boldsymbol{0}^m, \boldsymbol{v}_{k-m})$
 
 $Z$ is called a swizzling linear map.
-
-<br/><br/>
-Given the following linear maps:
-
-$S(\boldsymbol{r}) :\ F_2^m \rightarrow F_2^n$
-
-$
-\begin{aligned}
-\Omega: F_2^m \times F_2^n \rightarrow F_2^m \times F_2^n \\
-(\boldsymbol{r}, \boldsymbol{c}) \mapsto (\boldsymbol{r}, \boldsymbol{c} \oplus S(\boldsymbol{r}))
-\end{aligned}
-$
-
-$
-\begin{aligned}
-L:\ F_2^{m+n} &\rightarrow F_2^m \times F_2^n \\
-\boldsymbol{o} &\mapsto (\boldsymbol{r}, \boldsymbol{c})
-\end{aligned}
-$
-
-Then $Z = \Omega \circ L$ is called a swizzling linear map:
-
-$
-\begin{aligned}
-Z:\ F_2^{m+n} &\rightarrow F_2^m \times F_2^n \\
-\boldsymbol{o} &\mapsto (\boldsymbol{r}, \boldsymbol{c} \oplus S(\boldsymbol{r}))
-\end{aligned}
-$
-
-
+<br/>
 
 ## How does $Z$ help resolve GPU Shared Memory Bank Conflicts?
 

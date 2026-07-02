@@ -13,6 +13,7 @@
                 "${workspaceFolder}/third_party/**",
                 "${workspaceFolder}/build/include",
                 "${workspaceFolder}/build/third_party",
+                "${workspaceFolder}/build/third_party/nvidia/include",
                 "${workspaceFolder}/llvm-project/mlir/include",
                 "${workspaceFolder}/llvm-project/llvm/include",
                 "${workspaceFolder}/llvm-project/mlir/include",

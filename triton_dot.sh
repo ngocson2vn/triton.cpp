@@ -8,6 +8,7 @@ rm -rfv ${TRITON_CACHE_DIR}/*
 export TRITON_PRINT_AUTOTUNING="1"
 
 
-python3.11 triton_dot.py
+# python3.11 triton_dot.py
+python3.11 triton_dot_v2.py
 
 find ${TRITON_CACHE_DIR}
