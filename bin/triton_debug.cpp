@@ -622,12 +622,13 @@ int main(int argc, char **argv) {
 
   pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(mlir::createCSEPass());
-  pm.addPass(mlir::triton::createConvertNVGPUToLLVM());
-  pm.addPass(mlir::triton::createConvertWarpSpecializeToLLVM());
-  pm.addPass(mlir::createCanonicalizerPass());
-  pm.addPass(mlir::createCSEPass());
-  pm.addPass(mlir::createSymbolDCEPass());
-  pm.addPass(mlir::createConvertNVVMToLLVMPass());
+
+  // pm.addPass(mlir::triton::createConvertNVGPUToLLVM());
+  // pm.addPass(mlir::triton::createConvertWarpSpecializeToLLVM());
+  // pm.addPass(mlir::createCanonicalizerPass());
+  // pm.addPass(mlir::createCSEPass());
+  // pm.addPass(mlir::createSymbolDCEPass());
+  // pm.addPass(mlir::createConvertNVVMToLLVMPass());
 
   // Apply the pass
   if (failed(pm.run(module.get()))) {
@@ -639,6 +640,7 @@ int main(int argc, char **argv) {
   llvm::outs() << "Lowered MLIR:\n";
   module->print(llvm::outs());
 
+#if 0  
   // LLVM-IR (MLIR) -> LLVM-IR (LLVM)
   static std::once_flag init_flag;
   std::call_once(init_flag, []() {
@@ -758,6 +760,7 @@ int main(int argc, char **argv) {
     std::cerr << "stderr:\n" << stderrOutput << std::endl;
     return 1;
   }
+#endif
 
   return 0;
 }

@@ -3,6 +3,10 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/BuiltinAttributes.h"
 
+// MLIR Passes
+#include "mlir/Pass/PassManager.h"
+#include "mlir/Transforms/Passes.h"
+
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 
@@ -24,12 +28,25 @@
 #include "triton/Dialect/TritonNvidiaGPU/Transforms/TMAUtilities.h"
 #include "triton/Tools/LayoutUtils.h"
 
+#include "mlir/Support/LogicalResult.h"
+#include "llvm/Support/LogicalResult.h"
+
 using namespace mlir;
 using namespace mlir::triton;
 
 namespace tt = mlir::triton;
 namespace ttg = mlir::triton::gpu;
 namespace ttng = mlir::triton::nvidia_gpu;
+
+namespace mlir {
+namespace triton {
+
+#define GEN_PASS_DECL_SONYDEBUGPASS
+#define GEN_PASS_DEF_SONYDEBUGPASS
+#include "nvidia/include/TritonNVIDIAGPUToLLVMDebug/Passes.h.inc"
+
+} // namespace triton
+} // namespace mlir
 
 template <typename T>
 llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const SmallVector<T>& vec) {
@@ -121,28 +138,7 @@ getMsgToUnpackedOffsetLayout(const LinearLayout &packedLayout,
   return unpackLayout * packedLayout;
 }
 
-
-int main(int argc, char** argv) {
-  mlir::DialectRegistry registry;
-  registerTritonDialects(registry);
-
-  // For translating MLIR module to LLVM IR
-  mlir::registerBuiltinDialectTranslation(registry);
-  mlir::registerNVVMDialectTranslation(registry);
-  mlir::registerLLVMDialectTranslation(registry);
-
-  MLIRContext context(registry);
-  MLIRContext* ctx = &context;
-  context.loadAllAvailableDialects();
-  context.loadDialect<arith::ArithDialect>();
-  context.loadDialect<func::FuncDialect>();
-
-  // Create a ModuleOp
-  OpBuilder builder(ctx);
-  auto loc = UnknownLoc::get(ctx);
-  ModuleOp mod = builder.create<ModuleOp>(loc);
-  builder.setInsertionPointToStart(mod.getBody());
-
+static mlir::RankedTensorType createRankedTensorType(MLIRContext* ctx, OpBuilder& builder) {
   // 
   // Create a RankedTensorType instance
   // 
@@ -150,7 +146,7 @@ int main(int argc, char** argv) {
   // =======================
   // 1. Tensor shape
   // =======================
-  llvm::SmallVector<int64_t, 2> shape{128, 128};
+  llvm::SmallVector<int64_t, 2> shape{512, 256};
 
   // =======================
   // 2. Element type
@@ -189,7 +185,10 @@ int main(int argc, char** argv) {
   // #blocked = #ttg.blocked<{sizePerThread = [2, 2], threadsPerWarp = [1, 32], warpsPerCTA = [4, 1], order = [1, 0]}>
   // Read explanation in ../refs/BlockedEncoding.md
 
+  return tensorType;
+}
 
+static ttg::MemDescType createSmemTy(MLIRContext* ctx, OpBuilder& builder, mlir::RankedTensorType tensorType) {
   // 
   // Create ttg::MemDescType
   // 
@@ -204,17 +203,97 @@ int main(int argc, char** argv) {
 
   llvm::outs() << "smemTy: " << smemTy << "\n\n";
 
-  auto msgToPackedOffset = getMsgToPackedOffsetLayout(smemTy);
-  llvm::outs() << "msgToPackedOffset: " << msgToPackedOffset << "\n\n";
+  return smemTy;
+}
 
-  auto smemLayout = ttg::toLinearLayout(smemTy);
-  llvm::outs() << "smemLayout: " << smemLayout << "\n\n";
+struct ApplyLinearLayoutPattern : public OpConversionPattern<func::FuncOp> {
+  using OpConversionPattern::OpConversionPattern;
 
-  auto msgToShared = msgToPackedOffset.invertAndCompose(smemLayout);
-  llvm::outs() << "msgToShared: " << msgToShared << "\n\n";
+  LogicalResult
+  matchAndRewrite(func::FuncOp op,
+                  OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    llvm::outs() << "\n=== ApplyLinearLayoutPattern ===\n";
 
-  auto msgToOffset = getMsgToUnpackedOffsetLayout(msgToPackedOffset, smemTy);
-  llvm::outs() << "msgToOffset: " << msgToOffset << "\n\n";
+    auto ctx = getContext();
+    auto loc = op.getLoc();
+    auto ttb = TritonLLVMOpBuilder(loc, rewriter);
+    OpBuilder& builder = *(ttb.builder);
+
+    auto tensorType = createRankedTensorType(ctx, builder);
+    auto smemTy = createSmemTy(ctx, builder, tensorType);
+
+    auto msgToPackedOffset = getMsgToPackedOffsetLayout(smemTy);
+    llvm::outs() << "msgToPackedOffset: " << msgToPackedOffset << "\n\n";
+
+    auto smemLayout = ttg::toLinearLayout(smemTy);
+    llvm::outs() << "smemLayout: " << smemLayout << "\n\n";
+
+    auto msgToShared = msgToPackedOffset.invertAndCompose(smemLayout);
+    llvm::outs() << "msgToShared: " << msgToShared << "\n\n";
+
+    auto msgToOffset = getMsgToUnpackedOffsetLayout(msgToPackedOffset, smemTy);
+    llvm::outs() << "msgToOffset: " << msgToOffset << "\n\n";
+
+    // applyLinearLayout
+    auto kMsg = str_attr("msg");
+    auto kBlock = str_attr("block");
+    auto zero = ttb.i32_val(0);
+    Value warpID = ttb.i32_val(0);
+    int32_t copyIdx = 0;
+    Value copyIdxVal = ttb.add(warpID, ttb.i32_val(copyIdx));
+    // {{kMsg, copyIdxVal}, {kBlock, zero}} -> ArrayRef<std::pair<StringAttr, Value>> indices
+    llvm::outs() << kMsg.str() << ": " << copyIdxVal << "\n";
+    llvm::outs() << kBlock.str() << ": " << zero << "\n";
+    Value shMemOffset = applyLinearLayout(loc, rewriter, msgToShared, {{kMsg, copyIdxVal}, {kBlock, zero}})[0].second;
+    llvm::outs() << "shMemOffset: " << shMemOffset << "\n";
+
+    return success();
+  }
+};
+
+struct SonyDebugPass : public triton::impl::SonyDebugPassBase<SonyDebugPass> {
+  using SonyDebugPassBase::SonyDebugPassBase;
+
+  void runOnOperation() override {
+    MLIRContext *context = &getContext();
+    ModuleOp mod = getOperation();
+
+    // Lower functions
+    ConversionTarget debugTarget(*context);
+    RewritePatternSet debugPatterns(context);
+
+    debugPatterns.add<ApplyLinearLayoutPattern>(context);
+
+    if (failed(applyPartialConversion(mod, debugTarget, std::move(debugPatterns)))) {
+      return signalPassFailure();
+    }
+  }
+};
+
+
+int main(int argc, char** argv) {
+  mlir::DialectRegistry registry;
+  registerTritonDialects(registry);
+
+  // For translating MLIR module to LLVM IR
+  mlir::registerBuiltinDialectTranslation(registry);
+  mlir::registerNVVMDialectTranslation(registry);
+  mlir::registerLLVMDialectTranslation(registry);
+
+  MLIRContext context(registry);
+  MLIRContext* ctx = &context;
+  context.loadAllAvailableDialects();
+  context.loadDialect<arith::ArithDialect>();
+  context.loadDialect<func::FuncDialect>();
+
+  // Create a ModuleOp
+  OpBuilder builder(ctx);
+  auto loc = UnknownLoc::get(ctx);
+  ModuleOp mod = builder.create<ModuleOp>(loc);
+  builder.setInsertionPointToStart(mod.getBody());
+
+  auto tensorType = createRankedTensorType(ctx, builder);
 
   // 
   // Create FuncOp
@@ -230,6 +309,21 @@ int main(int argc, char** argv) {
   // Print the resulting module
   llvm::outs() << "\nMLIR module:\n";
   mod.print(llvm::outs());
+
+  // Set up the pass manager
+  context.disableMultithreading();
+  PassManager pm(ctx);
+
+  pm.addPass(createSonyDebugPass());
+  pm.addPass(mlir::createCanonicalizerPass());
+  pm.addPass(mlir::createCSEPass());
+
+  // Apply the pass
+  if (failed(pm.run(mod))) {
+    llvm::errs() << "Pass execution failed\n";
+    return 1;
+  }
+
   llvm::outs() << "\nAll done\n";
   return 0;
 }
