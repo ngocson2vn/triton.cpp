@@ -457,6 +457,7 @@ LinearLayout LinearLayout::reshapeIns(
   BasesT newBases;
   int i = 0;
   for (const auto &[inDim, inDimSize] : newInDims) {
+    llvm::outs() << "inDim: " << inDim.str() << "\n";
     auto &newInDimBases = newBases[inDim];
     for (int j = 1; j < inDimSize; j *= 2) {
       newInDimBases.push_back(flatBases[i++]);
@@ -872,6 +873,18 @@ bool LinearLayout::isTrivialOver(ArrayRef<StringAttr> dimNames) const {
          sublayoutIsZero(dimNames, remainingOutDimNames);
 }
 
+bool LinearLayout::isZero() const {
+  for (const auto& [inDimName, basisImages] : bases) {
+    for (const auto& basisImage : basisImages) {
+      for (const auto& coord : basisImage) {
+        if (coord > 0) return false;
+      }
+    }
+  }
+
+  return true;
+}
+
 std::optional<LinearLayout>
 LinearLayout::quotient(ArrayRef<StringAttr> dimNames) const {
   if (!isTrivialOver(dimNames)) {
@@ -910,7 +923,7 @@ LinearLayout LinearLayout::sublayout(ArrayRef<StringAttr> inDimNames,
     }
   }
 
-  llvm::outs() << "\noutDimIndicesToKeep: " << outDimIndicesToKeep << "\n\n";
+  // llvm::outs() << "\noutDimIndicesToKeep: " << outDimIndicesToKeep << "\n\n";
 
   BasesT newBases;
   for (auto [inDim, inDimBases] : bases) {

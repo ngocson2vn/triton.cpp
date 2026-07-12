@@ -235,18 +235,26 @@ struct ApplyLinearLayoutPattern : public OpConversionPattern<func::FuncOp> {
     auto msgToOffset = getMsgToUnpackedOffsetLayout(msgToPackedOffset, smemTy);
     llvm::outs() << "msgToOffset: " << msgToOffset << "\n\n";
 
-    // applyLinearLayout
+    int numWarps = ttg::lookupNumWarps(op);
+    llvm::outs() << "numWarps: " << numWarps << "\n";
+
     auto kMsg = str_attr("msg");
     auto kBlock = str_attr("block");
+
+    const auto numCopies = msgToOffset.getInDimSize(kMsg);
+    llvm::outs() << "numCopies: " << numCopies << "\n";
+
+    // applyLinearLayout
     auto zero = ttb.i32_val(0);
     Value warpID = ttb.i32_val(0);
-    int32_t copyIdx = 0;
-    Value copyIdxVal = ttb.add(warpID, ttb.i32_val(copyIdx));
-    // {{kMsg, copyIdxVal}, {kBlock, zero}} -> ArrayRef<std::pair<StringAttr, Value>> indices
-    llvm::outs() << kMsg.str() << ": " << copyIdxVal << "\n";
-    llvm::outs() << kBlock.str() << ": " << zero << "\n";
-    Value shMemOffset = applyLinearLayout(loc, rewriter, msgToShared, {{kMsg, copyIdxVal}, {kBlock, zero}})[0].second;
-    llvm::outs() << "shMemOffset: " << shMemOffset << "\n";
+    for (int copyIdx = 0; copyIdx < numCopies; copyIdx += numWarps) {
+      Value copyIdxVal = ttb.add(warpID, ttb.i32_val(copyIdx));
+      // {{kMsg, copyIdxVal}, {kBlock, zero}} -> ArrayRef<std::pair<StringAttr, Value>> indices
+      llvm::outs() << kMsg.str() << ": " << copyIdxVal << "\n";
+      llvm::outs() << kBlock.str() << ": " << zero << "\n";
+      Value shMemOffset = applyLinearLayout(loc, rewriter, msgToShared, {{kMsg, copyIdxVal}, {kBlock, zero}})[0].second;
+      llvm::outs() << "shMemOffset: " << shMemOffset << "\n\n";
+    }
 
     return success();
   }
@@ -291,6 +299,9 @@ int main(int argc, char** argv) {
   OpBuilder builder(ctx);
   auto loc = UnknownLoc::get(ctx);
   ModuleOp mod = builder.create<ModuleOp>(loc);
+
+  int32_t numWarps = 4;
+  mod->setAttr(ttg::AttrNumWarpsName, builder.getI32IntegerAttr(numWarps));
   builder.setInsertionPointToStart(mod.getBody());
 
   auto tensorType = createRankedTensorType(ctx, builder);

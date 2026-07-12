@@ -34,6 +34,15 @@ static int __builtin_ctz(unsigned x) {
 
 #endif
 
+static bool isSonyOptMode() {
+  static char* v = std::getenv("SONY_OPT_MODE");
+  if (v) {
+    return true;
+  }
+
+  return false;
+}
+
 namespace mlir {
 
 namespace triton::gpu {
@@ -118,6 +127,8 @@ Value matrixVectorProd(TritonLLVMOpBuilder &b, const LinearLayout &A, Value x) {
   SmallVector<int32_t> matrix = flatten(A.getBases().begin()->second);
   assert(matrix.size() == nCol);
 
+  // matrix is 1D, where each element represents a column of bits
+
   // Row-wise popcount to detect rows that appear exactly once across columns.
   uint32_t rowsUnique = 0;
   {
@@ -160,6 +171,7 @@ Value matrixVectorProd(TritonLLVMOpBuilder &b, const LinearLayout &A, Value x) {
     for (int i = -nRow + 1; i < nCol; i++) {
       masks.push_back(std::get<0>(getMaskAndAllRowsUnique(i)));
     }
+
     bool reachedFixedPoint = false;
     while (!reachedFixedPoint) {
       reachedFixedPoint = true;
@@ -254,6 +266,10 @@ applyLinearLayout(Location loc, RewriterBase &rewriter,
   // As a result we go through some contortions to avoid emitting code where
   // possible.
 
+  // x = c + v
+  // L(x) = L(c) + L(v)
+
+  // Split x into c and v
   // Manually constant-fold the layout where possible.
   SmallVector<std::pair<StringAttr, int32_t>> constantIns;
   SmallVector<std::pair<StringAttr, Value>> nonConstantIns;
@@ -267,6 +283,7 @@ applyLinearLayout(Location loc, RewriterBase &rewriter,
     }
   }
 
+  // Compute L(c)
   // Compute constant part of the output and wrap it as values
   Value zero = b.i32_val(0);
   SmallVector<std::pair<StringAttr, Value>> outIndices;
@@ -284,18 +301,47 @@ applyLinearLayout(Location loc, RewriterBase &rewriter,
   SmallVector<StringAttr> inDimNames;
   // Concatenate input
   Value x = b.i32_val(0);
+  llvm::outs() << "x: " << x << "\n";
   int shift = 0;
-  for (auto [inDimName, idx] : nonConstantIns) {
+  for (const auto& item : nonConstantIns) {
+    const auto& inDimName = item.first;
+    const auto& idx = item.second;
+
+    llvm::outs() << "shift: " << shift << "\n";
     inDimNames.push_back(inDimName);
-    x = b.or_(x, b.shl(idx, b.i32_val(shift)));
+    auto p = b.i32_val(shift);
+    auto q = b.shl(idx, p);
+    x = b.or_(x, q);
+    llvm::outs() << "p: " << p << "\n";
+    llvm::outs() << "q: " << q << "\n";
+    llvm::outs() << "x: " << x << "\n\n";
     shift += layout.getInDimSizeLog2(inDimName);
   }
 
-  for (auto &[outDimName, outIdx] : outIndices) {
+  // Compute L(v) + L(c)
+  // outIndices contains all out dim names and corresponding values
+  // which were computed in the previous step
+  for (auto& item : outIndices) {
+    const auto& outDimName = item.first;
+    auto& outIdx = item.second;
+
     // Apply flattened sublayout for this output
+    // inDimNames contains all non-constant in dim names
     auto matrix = layout.sublayout(inDimNames, outDimName).flattenIns();
+    if (matrix.isZero()) {
+      llvm::outs() << "matrix is a zero map: " << matrix << "\n\n";
+      if (isSonyOptMode()) continue;
+    } else {
+      llvm::outs() << "matrix: " << matrix << "\n";
+    }
+
+    llvm::outs() << "BEFORE outIdx: " << outIdx << "\n";
+
     auto out = triton::gpu::matrixVectorProd(b, matrix, x);
+    llvm::outs() << "matrixVectorProd out: " << out << "\n";
+
     outIdx = b.xor_(outIdx, out);
+    llvm::outs() << "AFTERR outIdx: " << outIdx << "\n\n";
   }
 
   return outIndices;
