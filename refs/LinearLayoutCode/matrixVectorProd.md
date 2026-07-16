@@ -91,10 +91,10 @@ $`\text{term} = (x \;\&\; \text{mask}_i) \gg i`$
 
 where $\text{mask}_i$ has bit $c$ set iff $c - i \ge 0$ and $A[c-i,\,c] = 1$ (this is exactly `getMaskAndAllRowsUnique`'s loop, which walks `row = 0, col = i` and sets bit `col` of the mask when `matrix[col]` has bit `row` set).
 
-- **Masking**: bit $c$ of $x \,\&\, \text{mask}_i$ equals $A[c-i,c]\cdot x_c$ (zero if that matrix entry is 0, and zero for any $c$ not on diagonal $i$).
+- **Masking**: bit $c$ of $`x \,\&\, \text{mask}_i`$ equals $`A[c-i,c]\cdot x_c`$ (zero if that matrix entry is 0, and zero for any $c$ not on diagonal $i$).
 - **Shifting right by $i$**: this moves bit $c$ to position $c - i = \text{row}$.
 
-So bit $\text{row}$ of the shifted result is $A[\text{row}, \text{row}+i] \cdot x_{\text{row}+i}$ — which is *exactly* the definition of $\text{term}(i)_{\text{row}}$ from Step 2. (The $i<0$ case with left shift is the same argument with the shift direction reversed, as established earlier.)
+So bit $\text{row}$ of the shifted result is $`A[\text{row}, \text{row}+i] \cdot x_{\text{row}+i}`$ — which is *exactly* the definition of $`\text{term}(i)_{\text{row}}`$ from Step 2. (The $i<0$ case with left shift is the same argument with the shift direction reversed, as established earlier.)
 
 ## 3. Conclusion
 
