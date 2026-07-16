@@ -7,7 +7,7 @@ Let $`A \in \mathbb{F}_2^{\,n_{\text{row}} \times n_{\text{col}}}`$ be the matri
 
 ### Step 1: Construct each $y_{\text{row}}$ independently, purely from the definition
 
-By definition of matrix–vector multiplication over $\mathbb{F}_2$, for each fixed $\text{row} \in \{0,\dots,n_{\text{row}}-1\}$:
+By definition of matrix–vector multiplication over $\mathbb{F}_2$, for each fixed $`\text{row} \in \{0,\dots,n_{\text{row}}-1\}`$:
 
 $`y_{\text{row}} = \bigoplus\limits_{\text{col}=0}^{n_{\text{col}}-1} A(\text{row},\text{col})\cdot x(\text{col})`$ (1)
 
