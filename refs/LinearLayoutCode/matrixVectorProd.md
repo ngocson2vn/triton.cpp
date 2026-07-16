@@ -63,10 +63,10 @@ We can expand $y_{\text{row}}$ for each row as follows:
 
 | $\text{row}$ | $y_\text{row}$ |
 |--------------|----------------|
-|$\text{row}_0$|$\text{term}(i_0)_{\text{row}_0} \oplus \text{term}(i_1)_{\text{row}_0} \oplus \dots \oplus \text{term}(i_K)_{\text{row}_0}$|
-|$\text{row}_1$|$\text{term}(i_0)_{\text{row}_1} \oplus \text{term}(i_1)_{\text{row}_1} \oplus \dots \oplus \text{term}(i_K)_{\text{row}_1}$|
+|$\text{row}_0$|$`\text{term}(i_0)_{\text{row}_0} \oplus \text{term}(i_1)_{\text{row}_0} \oplus \dots \oplus \text{term}(i_K)_{\text{row}_0}`$|
+|$\text{row}_1$|$`\text{term}(i_0)_{\text{row}_1} \oplus \text{term}(i_1)_{\text{row}_1} \oplus \dots \oplus \text{term}(i_K)_{\text{row}_1}`$|
 | .            | .                                                                                                                          |
-|$\text{row}_R$|$\text{term}(i_0)_{\text{row}_R} \oplus \text{term}(i_1)_{\text{row}_R} \oplus \dots \oplus \text{term}(i_K)_{\text{row}_R}$|
+|$\text{row}_R$|$`\text{term}(i_0)_{\text{row}_R} \oplus \text{term}(i_1)_{\text{row}_R} \oplus \dots \oplus \text{term}(i_K)_{\text{row}_R}`$|
 |              |                                                                                                                            |
 
 where $K$ is the size of the set $I$ minus 1 and $R = n_{\text{row}} - 1$
