@@ -3,7 +3,7 @@ Let's put this on solid footing using linear algebra over $\mathbb{F}_2$ (the fi
 
 ### Setup
 
-Let $`A \in \mathbb{F}_2^{\,n_{\text{row}} \times n_{\text{col}}}$ be the matrix, $x \in \mathbb{F}_2^{\,n_{\text{col}}}`$ the input vector, and $`y = Ax \in \mathbb{F}_2^{\,n_{\text{row}}}`$ the output.
+Let $`A \in \mathbb{F}_2^{\,n_{\text{row}} \times n_{\text{col}}}`$ be the matrix, $`x \in \mathbb{F}_2^{\,n_{\text{col}}}`$ the input vector, and $`y = Ax \in \mathbb{F}_2^{\,n_{\text{row}}}`$ the output.
 
 ### Step 1: Construct each $y_{\text{row}}$ independently, purely from the definition
 
