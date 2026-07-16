@@ -43,7 +43,7 @@ Equation (3) now sums over the **same** index set $I$ for every row — this is 
 
 ### Step 4: Induce $\text{term}(i)$ from $s_i(\text{row})$
 
-Fix $`i \in I$, let row run. The expression $s_i(\text{row})`$ defined inside (3) is, for that fixed $i$, a rule assigning a scalar in $`\mathbb{F}_2$ to *each* $\text{row} \in \{0,\dots,n_{\text{row}}-1\}`$. That is precisely the data of a function
+Fix $`i \in I$, let row run. The expression $`s_i(\text{row})`$ defined inside (3) is, for that fixed $i$, a rule assigning a scalar in $`\mathbb{F}_2$ to *each* $\text{row} \in \{0,\dots,n_{\text{row}}-1\}`$. That is precisely the data of a function
 
 $`\{0,\dots,n_{\text{row}}-1\} \to \mathbb{F}_2,`$
 
