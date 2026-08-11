@@ -46,7 +46,7 @@ module attributes {"ttg.num-ctas" = 1 : i32, "ttg.num-warps" = 4 : i32, ttg.shar
 }
 
 
-// -----// IR Dump After TritonNvidiaGpuLoweringDebugPass (triton-nvidia-gpu-lowering-debug) //----- //
+// -----// IR Dump After ConvertTritonGPUToLLVMDebug (convert-triton-gpu-to-llvm-debug) //----- //
 #shared = #ttg.nvmma_shared<{swizzlingByteWidth = 128, transposed = false, elementBitWidth = 16}>
 module attributes {"ttg.num-ctas" = 1 : i32, "ttg.num-warps" = 4 : i32, ttg.shared = 8200 : i32, ttg.target = "cuda:100", "ttg.threads-per-warp" = 32 : i32, "ttg.total-num-warps" = 4 : i32} {
   llvm.mlir.global external @global_smem() {addr_space = 3 : i32, alignment = 16 : i64} : !llvm.array<0 x i8>

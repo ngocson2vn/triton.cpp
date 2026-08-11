@@ -618,7 +618,7 @@ int main(int argc, char **argv) {
   // which includes the following conversion patterns
   // 1. Patterns for converting ttg -> llvm, which is implemented in `lib/Conversion/TritonGPUToLLVM/`
   // 2. Patterns for converting ttng -> llvm, which is implemented in `third_party/nvidia/lib/TritonNVIDIAGPUToLLVM/`
-  pm.addPass(mlir::triton::createTritonNvidiaGpuLoweringDebugPass({capability, ptxVersion}));
+  pm.addPass(mlir::triton::createConvertTritonGPUToLLVMDebug({capability, ptxVersion}));
 
   pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(mlir::createCSEPass());

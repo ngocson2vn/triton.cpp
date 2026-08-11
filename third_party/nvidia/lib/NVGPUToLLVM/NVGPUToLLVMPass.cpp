@@ -8,7 +8,7 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#include "nvidia/lib/TritonNVIDIAGPUToLLVM/Utility.h"
+#include "nvidia/lib/TritonNVIDIAGPUToLLVMDebug/Utility.h"
 #include "llvm/Support/ErrorHandling.h"
 
 namespace ttn = mlir::triton::nvgpu;

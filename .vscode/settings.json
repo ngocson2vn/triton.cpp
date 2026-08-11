@@ -134,10 +134,10 @@
     "*.ttgir": "mlir",
     "*.llir": "mlir"
   },
-  "lldb-dap.executable-path": "/usr/lib/llvm-20/bin/lldb-dap",
+  "lldb-dap.executable-path": "/usr/bin/lldb-dap",
   "python.languageServer": "Pylance",
   "python.analysis.extraPaths": [
     "/opt/tiger/byted_tf_opt",
-    "/data05/home/son.nguyen/.pyenv/versions/3.11.2/lib/python3.11/site-packages"
+    "${HOME}/.pyenv/versions/3.11.2/lib/python3.11/site-packages"
   ]
 }

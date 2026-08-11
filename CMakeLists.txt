@@ -13,24 +13,30 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 message(STATUS "The C++ compiler path is: ${CMAKE_CXX_COMPILER}\n")
 
 # Compiler flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__STDC_FORMAT_MACROS")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__STDC_FORMAT_MACROS -Wno-c23-extensions -Wno-c2y-extensions -Wno-deprecated-declarations -Wno-unused-command-line-argument")
 
-# #########
-# LLVM
-# #########
-set(LLVM_BINARY_DIR ${PROJECT_SOURCE_DIR}/llvm-project/build)
-add_subdirectory(llvm-project/llvm ${LLVM_BINARY_DIR})
+#============================================================================
+# MLIR and LLVM
+#============================================================================
+find_package(MLIR REQUIRED CONFIG)
+find_package(LLVM REQUIRED CONFIG)
 
 # LLVM and MLIR headers
-include_directories(${PROJECT_SOURCE_DIR}/llvm-project/llvm/include)
-include_directories(${PROJECT_SOURCE_DIR}/llvm-project/mlir/include)
+message(STATUS "MLIR_INCLUDE_DIRS: ${MLIR_INCLUDE_DIRS}")
+message(STATUS "LLVM_INCLUDE_DIRS: ${LLVM_INCLUDE_DIRS}")
+include_directories(${MLIR_INCLUDE_DIRS})
+include_directories(${LLVM_INCLUDE_DIRS})
 
-# Some headers are generated automatically, which is why we need to include the following directories
-include_directories(${LLVM_BINARY_DIR}/include)
-include_directories(${LLVM_BINARY_DIR}/tools/mlir/include)
-
+message(STATUS "MLIR_CMAKE_DIR: ${MLIR_CMAKE_DIR}")
+message(STATUS "LLVM_CMAKE_DIR: ${LLVM_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
+message(STATUS "CMAKE_MODULE_PATH: ${CMAKE_MODULE_PATH}")
+
+include(TableGen)
+include(AddLLVM)
+include(AddMLIR)
+#============================================================================
 
 # Utilities
 function(add_triton_object name)

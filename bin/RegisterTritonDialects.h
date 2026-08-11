@@ -29,7 +29,7 @@
 #include "nvidia/hopper/include/Transforms/Passes.h"
 #include "nvidia/include/Dialect/NVWS/Transforms/Passes.h"
 #include "nvidia/include/NVGPUToLLVM/Passes.h"
-#include "nvidia/include/TritonNVIDIAGPUToLLVM/Passes.h"
+// #include "nvidia/include/TritonNVIDIAGPUToLLVM/Passes.h"
 #include "nvidia/include/TritonNVIDIAGPUToLLVMDebug/Passes.h"
 #include "triton/Conversion/TritonGPUToLLVM/Passes.h"
 #include "triton/Conversion/TritonToTritonGPU/Passes.h"
@@ -82,14 +82,14 @@ inline void registerTritonDialects(mlir::DialectRegistry &registry) {
   mlir::triton::gpu::registerAllocateSharedMemoryPass();
   mlir::triton::gpu::registerTritonGPUAllocateWarpGroups();
   mlir::triton::gpu::registerTritonGPUGlobalScratchAllocationPass();
-  mlir::triton::registerConvertWarpSpecializeToLLVM();
-  mlir::triton::registerConvertTritonGPUToLLVMPass();
-  mlir::triton::registerConvertNVGPUToLLVMPass();
+  // mlir::triton::registerConvertWarpSpecializeToLLVM();
+  mlir::triton::registerConvertTritonGPUToLLVMDebugPass();
+  // mlir::triton::registerConvertNVGPUToLLVMPass();
   mlir::triton::registerAllocateSharedMemoryNvPass();
-  mlir::registerLLVMDIScope();
+  // mlir::registerLLVMDIScope();
   mlir::LLVM::registerInlinerInterface(registry);
   mlir::NVVM::registerInlinerInterface(registry);
-  mlir::registerLLVMDILocalVariable();
+  // mlir::registerLLVMDILocalVariable();
 
   // TritonAMDGPUToLLVM passes
   // mlir::triton::registerAllocateAMDGPUSharedMemory();

@@ -19,38 +19,6 @@ find_library(CUDA_RUNTIME
 )
 message(STATUS "CUDA_RUNTIME: ${CUDA_RUNTIME}")
 
-# triton_compiler
-add_llvm_executable(triton_compiler triton_compiler.cpp PARTIAL_SOURCES_INTENDED)
-target_compile_options(triton_compiler PRIVATE -fno-rtti -g -O0)
-llvm_update_compile_flags(triton_compiler)
-target_link_libraries(triton_compiler PRIVATE
-  ${dialect_libs}
-  ${conversion_libs}
-  ${triton_libs}
-
-  # MLIR core
-  MLIROptLib
-  MLIRPass
-  MLIRRegisterAllPasses
-  MLIRTransforms
-  MLIRLLVMToLLVMIRTranslation
-
-  # LLVM
-  LLVMTarget
-  LLVMX86CodeGen
-  LLVMX86AsmParser
-  LLVMX86Disassembler
-  LLVMX86TargetMCA
-  LLVMX86Desc
-  LLVMX86Info
-
-  # CUDA
-  ${CUDA_RUNTIME}
-  ${CUDA_DRIVER}
-)
-
-mlir_check_all_link_libraries(triton_compiler)
-
 # Compile triton_debug.cpp
 add_llvm_executable(triton_debug triton_debug.cpp PARTIAL_SOURCES_INTENDED)
 target_compile_options(triton_debug PRIVATE -fno-rtti -g -O0)
@@ -83,37 +51,72 @@ target_link_libraries(triton_debug PRIVATE
 
 mlir_check_all_link_libraries(triton_debug)
 
-# triton_test
-add_llvm_executable(triton_test triton_test.cpp PARTIAL_SOURCES_INTENDED)
-target_compile_options(triton_test PRIVATE -fno-rtti -g -O0)
-llvm_update_compile_flags(triton_test)
-target_link_libraries(triton_test PRIVATE
-  ${dialect_libs}
-  ${conversion_libs}
-  ${triton_libs}
 
-  # MLIR core
-  MLIROptLib
-  MLIRPass
-  MLIRRegisterAllPasses
-  MLIRTransforms
-  MLIRLLVMToLLVMIRTranslation
 
-  # LLVM
-  LLVMTarget
-  LLVMX86CodeGen
-  LLVMX86AsmParser
-  LLVMX86Disassembler
-  LLVMX86TargetMCA
-  LLVMX86Desc
-  LLVMX86Info
 
-  # CUDA
-  ${CUDA_RUNTIME}
-  ${CUDA_DRIVER}
-)
+# # triton_compiler
+# add_llvm_executable(triton_compiler triton_compiler.cpp PARTIAL_SOURCES_INTENDED)
+# target_compile_options(triton_compiler PRIVATE -fno-rtti -g -O0)
+# llvm_update_compile_flags(triton_compiler)
+# target_link_libraries(triton_compiler PRIVATE
+#   ${dialect_libs}
+#   ${conversion_libs}
+#   ${triton_libs}
 
-mlir_check_all_link_libraries(triton_test)
+#   # MLIR core
+#   MLIROptLib
+#   MLIRPass
+#   MLIRRegisterAllPasses
+#   MLIRTransforms
+#   MLIRLLVMToLLVMIRTranslation
+
+#   # LLVM
+#   LLVMTarget
+#   LLVMX86CodeGen
+#   LLVMX86AsmParser
+#   LLVMX86Disassembler
+#   LLVMX86TargetMCA
+#   LLVMX86Desc
+#   LLVMX86Info
+
+#   # CUDA
+#   ${CUDA_RUNTIME}
+#   ${CUDA_DRIVER}
+# )
+
+# mlir_check_all_link_libraries(triton_compiler)
+
+# # triton_test
+# add_llvm_executable(triton_test triton_test.cpp PARTIAL_SOURCES_INTENDED)
+# target_compile_options(triton_test PRIVATE -fno-rtti -g -O0)
+# llvm_update_compile_flags(triton_test)
+# target_link_libraries(triton_test PRIVATE
+#   ${dialect_libs}
+#   ${conversion_libs}
+#   ${triton_libs}
+
+#   # MLIR core
+#   MLIROptLib
+#   MLIRPass
+#   MLIRRegisterAllPasses
+#   MLIRTransforms
+#   MLIRLLVMToLLVMIRTranslation
+
+#   # LLVM
+#   LLVMTarget
+#   LLVMX86CodeGen
+#   LLVMX86AsmParser
+#   LLVMX86Disassembler
+#   LLVMX86TargetMCA
+#   LLVMX86Desc
+#   LLVMX86Info
+
+#   # CUDA
+#   ${CUDA_RUNTIME}
+#   ${CUDA_DRIVER}
+# )
+
+# mlir_check_all_link_libraries(triton_test)
 
 # #======================================================
 # # test_linear_layout

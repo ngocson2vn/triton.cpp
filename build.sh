@@ -4,10 +4,10 @@ set -e
 
 ROOT_DIR=$(pwd)
 echo "ROOT_DIR=${ROOT_DIR}"
-mkdir -p ${ROOT_DIR}/build
 
 # git submodule update --init --recursive
 
+CUDA_VERSION=${CUDA_VERSION:-13.1}
 if [ -z ${CUDA_VERSION} ]; then
   echo "CUDA_VERSION is empty! Please export it."
   exit 1
@@ -15,21 +15,15 @@ fi
 export CUDA_HOME=/usr/local/cuda-${CUDA_VERSION}
 echo "CUDA_HOME=${CUDA_HOME}"
 
-pre_hash=""
-if [ -f ${ROOT_DIR}/.cmake.sha256 ]; then
-  pre_hash=$(cat ${ROOT_DIR}/.cmake.sha256)
-fi
-now_hash=$(sha256sum ${ROOT_DIR}/CMakeLists.txt | awk '{print $1}')
-
-if [ "${now_hash}" != "${pre_hash}" ]; then
-  echo "${now_hash} != ${pre_hash}"
-  echo
-  echo "==================================================="
-  echo "Generate ninja build file"
-  echo "==================================================="
-  cd ${ROOT_DIR}/build
-  cmake -G Ninja -DTRITON_CODEGEN_BACKENDS=nvidia .. \
+echo
+echo "==================================================="
+echo "1. Build llvm-project"
+echo "==================================================="
+if [ ! -f ./.build_llvm.done ]; then
+  mkdir -p llvm-project/build
+  cmake -G Ninja -S llvm-project/llvm -B llvm-project/build/ \
     -DCMAKE_BUILD_TYPE=Debug \
+    -DCMAKE_CXX_FLAGS="-D__STDC_FORMAT_MACROS -Wno-c23-extensions -Wno-c2y-extensions -Wno-deprecated-declarations -Wno-unused-command-line-argument" \
     -DLLVM_ENABLE_PROJECTS="mlir;compiler-rt" \
     -DLLVM_BUILD_EXAMPLES=OFF \
     -DLLVM_TARGETS_TO_BUILD="Native;X86;NVPTX;AMDGPU" \
@@ -41,15 +35,23 @@ if [ "${now_hash}" != "${pre_hash}" ]; then
     -DCOMPILER_RT_BUILD_GWP_ASAN=OFF \
     -DLLVM_INCLUDE_TESTS=OFF \
     -DCOMPILER_RT_BUILD_SANITIZERS=ON
-
-  yes | echo ${now_hash} > ${ROOT_DIR}/.cmake.sha256
+  
+  cmake --build llvm-project/build/
+  
+  touch ./.build_llvm.done
 fi
+echo "DONE"
 
 echo
 echo "==================================================="
-echo "Run ninja build"
+echo "2. Build triton.cpp"
 echo "==================================================="
-cd ${ROOT_DIR}/build
-cmake --build .
+mkdir -p build/
+cmake -G Ninja -S . -B build/ \
+  -DTRITON_CODEGEN_BACKENDS=nvidia \
+  -DMLIR_DIR=${ROOT_DIR}/llvm-project/build/lib/cmake/mlir \
+  -DLLVM_DIR=${ROOT_DIR}/llvm-project/build/lib/cmake/llvm
+
+cmake --build build/
 
 echo "DONE"
