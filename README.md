@@ -32,11 +32,16 @@ git fetch origin ${COMMIT_HASH}
 
 ## Build
 ### Prerequisites
+#### 1. Install required deps
+```bash
+sudo apt install -y lsb-release wget software-properties-common gnupg ccache cmake ninja-build
+```
+
+#### 2. Install clang
 ```Bash
 # clang 17
 wget https://apt.llvm.org/llvm.sh
 chmod u+x llvm.sh
-sudo apt install -y lsb-release wget software-properties-common gnupg
 sudo ./llvm.sh 17
 cd /usr/bin/
 sudo ln -sf ../lib/llvm-17/bin/clang .
@@ -45,6 +50,12 @@ sudo ln -sf ../lib/llvm-17/bin/ld.lld .
 sudo ln -sf ../lib/llvm-17/bin/llvm-dwarfdump .
 sudo ln -sf ../lib/llvm-17/bin/lldb .
 sudo ln -sf ../lib/llvm-17/bin/lldb-vscode ./lldb-dap
+
+# For clang 22
+export http_proxy=example.com
+export https_proxy=example.com
+export no_proxy=laniakea.com
+sudo ./llvm.sh 22
 
 # CUDA
 /usr/local/cuda-12.4
