@@ -6,3 +6,4 @@ tmp/
 output.*
 .vscode/vc.*
 lowering.mlir
+.build_llvm.done

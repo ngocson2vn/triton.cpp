@@ -132,6 +132,7 @@
     "*.mlir": "mlir",
     "*.ttir": "mlir",
     "*.ttgir": "mlir",
+    "*.ttngir": "mlir",
     "*.llir": "mlir"
   },
   "lldb-dap.executable-path": "/usr/bin/lldb-dap",

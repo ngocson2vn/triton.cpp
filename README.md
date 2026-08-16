@@ -39,6 +39,13 @@ sudo apt install -y lsb-release wget software-properties-common gnupg ccache cma
 
 #### 2. Install clang
 ```Bash
+# For clang 22
+# Can build `debug` branch with clang 22
+export http_proxy=example.com
+export https_proxy=example.com
+export no_proxy=laniakea.com
+sudo ./llvm.sh 22
+
 # clang 17
 wget https://apt.llvm.org/llvm.sh
 chmod u+x llvm.sh
@@ -50,12 +57,6 @@ sudo ln -sf ../lib/llvm-17/bin/ld.lld .
 sudo ln -sf ../lib/llvm-17/bin/llvm-dwarfdump .
 sudo ln -sf ../lib/llvm-17/bin/lldb .
 sudo ln -sf ../lib/llvm-17/bin/lldb-vscode ./lldb-dap
-
-# For clang 22
-export http_proxy=example.com
-export https_proxy=example.com
-export no_proxy=laniakea.com
-sudo ./llvm.sh 22
 
 # CUDA
 /usr/local/cuda-12.4

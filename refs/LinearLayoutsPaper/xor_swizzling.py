@@ -3,17 +3,24 @@ import torch
 ROWS = 8
 COLS = 64
 VEC = 8
-K = 8
+K = 64//VEC
 
-def S(r):
-  return VEC * (r % K)
+def S(i):
+  return VEC * (i % K)
 
 A = torch.randint(0, 10, (ROWS, COLS)).tolist()
 print("Before swizzling:")
 for row in A:
+  # Update the first 8 elements in every row i
   for j in range(VEC):
     row[j] = j
-  print(row)
+
+  # Create printRow for row i
+  printRow = []
+  for k in range(COLS//VEC):
+    chunk = tuple(row[(k*VEC):(k*VEC + VEC)])
+    printRow.append(chunk)
+  print(printRow)
 print()
 
 # Perform swizzling
@@ -28,5 +35,10 @@ for i in range(ROWS):
 
 print("\nAfter swizzling:")
 for row in swizzled_A:
-  print(row)
+  # Create printRow for row i
+  printRow = []
+  for k in range(COLS//VEC):
+    chunk = tuple(row[(k*VEC):(k*VEC + VEC)])
+    printRow.append(chunk)
+  print(printRow)
 print()
