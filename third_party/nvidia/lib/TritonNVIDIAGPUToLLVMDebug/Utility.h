@@ -25,6 +25,27 @@ namespace mlir::triton::gpu {
 class MemDescType;
 }
 
+namespace llvm {
+
+template <typename T>
+raw_ostream& operator<<(raw_ostream& os, const SmallVector<T>& vec) {
+  if (vec.empty()) {
+    llvm::outs() << "[]\n";
+    return os;
+  }
+
+  llvm::outs() << "[" << vec[0];
+  for (int i = 1; i < vec.size(); i++) {
+    llvm::outs() << ", " << vec[i];
+  }
+
+  llvm::outs() << "]";
+
+  return os;
+}
+
+}
+
 namespace mlir {
 namespace LLVM {
 

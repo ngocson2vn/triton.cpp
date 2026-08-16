@@ -1268,6 +1268,7 @@ static LinearLayout getMsgToPackedOffsetLayout(ttg::MemDescType ty) {
   auto shapePerCTA = ttg::getShapePerCTA(ty);
   int rank = shapePerCTA.size();
   auto blockShape = ttng::getTMABlockShape(ty, /*packedSize=*/true);
+  llvm::outs() << "blockShape: " << blockShape << "\n";
   auto outDimNames = standardOutDimNames(ctx, rank);
   LinearLayout msgToOffset;
   for (int dim = 0; dim < rank; ++dim) {
@@ -1353,6 +1354,8 @@ struct AsyncTMACopyGlobalToLocalOpConversion
     int rank = op.getCoord().size();
 
     auto msgToPackedOffset = getMsgToPackedOffsetLayout(smemTy);
+    llvm::outs() << "msgToPackedOffset: " << msgToPackedOffset << "\n";
+
     auto smemLayout = ttg::toLinearLayout(smemTy);
     auto msgToShared = msgToPackedOffset.invertAndCompose(smemLayout);
     auto msgToOffset = getMsgToUnpackedOffsetLayout(msgToPackedOffset, smemTy);
@@ -1361,6 +1364,9 @@ struct AsyncTMACopyGlobalToLocalOpConversion
     auto kMsg = str_attr("msg");
     auto kBlock = str_attr("block");
     const auto numCopies = msgToOffset.getInDimSize(kMsg);
+
+    llvm::outs() << "numCopies: " << numCopies << "\n";
+
     auto zero = b.i32_val(0);
     auto ctaId = nvgpu::ClusterCTAIdOp::create(rewriter, loc);
 
@@ -1407,7 +1413,7 @@ struct AsyncTMACopyGlobalToLocalOpConversion
           ptxBuilderTMA.newOperand(barrierMemObj.getBase(), "r"));
       tmaInst += "}], [$" + std::to_string(operandIdx++) + "];";
 
-      llvm::outs() << tmaInst << "\n\n";
+      llvm::outs() << "copyIdx: " << copyIdx << " tmaInst: " << tmaInst << "\n\n";
 
       auto &tma = *ptxBuilderTMA.create(tmaInst);
       tma(operands, /*onlyAttachMLIRArgs=*/true);
