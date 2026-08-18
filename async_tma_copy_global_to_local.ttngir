@@ -4,11 +4,15 @@
 #smem = #ttg.shared_memory
 module attributes {"ttg.num-ctas" = 1 : i32, "ttg.num-warps" = 1 : i32, ttg.target = "cuda:100", "ttg.threads-per-warp" = 32 : i32} {
   tt.func public @triton_dot(%arg0: !tt.tensordesc<tensor<128x64xf16, #shared>>) attributes {noinline = false} {
-    %c0_i32 = arith.constant 0 : i32
     %true = arith.constant true
-    %0 = ttg.local_alloc : () -> !ttg.memdesc<128x64xf16, #shared, #smem, mutable>
-    %1 = ttg.local_alloc : () -> !ttg.memdesc<1xi64, #shared2, #smem, mutable>
+    %c0_i32 = arith.constant 0 : i32
+    %0 = ttg.local_alloc {allocation.offset = 0 : i32} : () -> !ttg.memdesc<128x64xf16, #shared, #smem, mutable>
+    %1 = ttg.local_alloc {allocation.offset = 16384 : i32} : () -> !ttg.memdesc<1xi64, #shared2, #smem, mutable>
+    ttng.init_barrier %1, 1 : !ttg.memdesc<1xi64, #shared2, #smem, mutable>
+    ttng.barrier_expect %1, 16384, %true : !ttg.memdesc<1xi64, #shared2, #smem, mutable>
     ttng.async_tma_copy_global_to_local %arg0[%c0_i32, %c0_i32] %0, %1, %true : !tt.tensordesc<tensor<128x64xf16, #shared>>, !ttg.memdesc<1xi64, #shared2, #smem, mutable> -> !ttg.memdesc<128x64xf16, #shared, #smem, mutable>
+    ttng.wait_barrier %1, %c0_i32 : !ttg.memdesc<1xi64, #shared2, #smem, mutable>
+    ttng.inval_barrier %1 : !ttg.memdesc<1xi64, #shared2, #smem, mutable>
     tt.return
   }
 }
