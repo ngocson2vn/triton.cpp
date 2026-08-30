@@ -637,8 +637,8 @@ int main(int argc, char **argv) {
   }
 
   // Print the resulting module
-  llvm::outs() << "Lowered MLIR:\n";
-  module->print(llvm::outs());
+  // llvm::outs() << "Lowered MLIR:\n";
+  // module->print(llvm::outs());
 
 #if 0  
   // LLVM-IR (MLIR) -> LLVM-IR (LLVM)

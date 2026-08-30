@@ -301,20 +301,20 @@ applyLinearLayout(Location loc, RewriterBase &rewriter,
   SmallVector<StringAttr> inDimNames;
   // Concatenate input
   Value x = b.i32_val(0);
-  llvm::outs() << "x: " << x << "\n";
+  // llvm::outs() << "x: " << x << "\n";
   int shift = 0;
   for (const auto& item : nonConstantIns) {
     const auto& inDimName = item.first;
     const auto& idx = item.second;
 
-    llvm::outs() << "shift: " << shift << "\n";
+    // llvm::outs() << "shift: " << shift << "\n";
     inDimNames.push_back(inDimName);
     auto p = b.i32_val(shift);
     auto q = b.shl(idx, p);
     x = b.or_(x, q);
-    llvm::outs() << "p: " << p << "\n";
-    llvm::outs() << "q: " << q << "\n";
-    llvm::outs() << "x: " << x << "\n\n";
+    // llvm::outs() << "p: " << p << "\n";
+    // llvm::outs() << "q: " << q << "\n";
+    // llvm::outs() << "x: " << x << "\n\n";
     shift += layout.getInDimSizeLog2(inDimName);
   }
 
@@ -328,20 +328,20 @@ applyLinearLayout(Location loc, RewriterBase &rewriter,
     // Apply flattened sublayout for this output
     // inDimNames contains all non-constant in dim names
     auto matrix = layout.sublayout(inDimNames, outDimName).flattenIns();
-    if (matrix.isZero()) {
-      llvm::outs() << "matrix is a zero map: " << matrix << "\n\n";
-      if (isSonyOptMode()) continue;
-    } else {
-      llvm::outs() << "matrix: " << matrix << "\n";
-    }
+    // if (matrix.isZero()) {
+    //   llvm::outs() << "matrix is a zero map: " << matrix << "\n\n";
+    //   if (isSonyOptMode()) continue;
+    // } else {
+    //   llvm::outs() << "matrix: " << matrix << "\n";
+    // }
 
-    llvm::outs() << "BEFORE outIdx: " << outIdx << "\n";
+    // llvm::outs() << "BEFORE outIdx: " << outIdx << "\n";
 
     auto out = triton::gpu::matrixVectorProd(b, matrix, x);
-    llvm::outs() << "matrixVectorProd out: " << out << "\n";
+    // llvm::outs() << "matrixVectorProd out: " << out << "\n";
 
     outIdx = b.xor_(outIdx, out);
-    llvm::outs() << "AFTERR outIdx: " << outIdx << "\n\n";
+    // llvm::outs() << "AFTERR outIdx: " << outIdx << "\n\n";
   }
 
   return outIndices;
